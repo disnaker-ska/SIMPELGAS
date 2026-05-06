@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAppContext, API_URL } from '../AppContext';
-import { FileSignature, Camera, FileText, Send, Loader2 } from 'lucide-react';
+import { FileSignature, Camera, FileText, Send, Loader2, Sparkles } from 'lucide-react';
 import Swal from 'sweetalert2';
 import LoaderOverlay from './LoaderOverlay';
 
@@ -8,6 +8,8 @@ const InputData = () => {
   const { pegawaiList, loadDashboardData } = useAppContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBidang, setSelectedBidang] = useState('');
+  const [catatanText, setCatatanText] = useState('');
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const formRef = useRef(null);
 
   // Get unique bidang from pegawaiList dynamically, fallback if none
@@ -22,7 +24,7 @@ const InputData = () => {
   // Helper: Read a single file as Base64 string
   const getBase64 = (file) => {
     return new Promise((resolve, reject) => {
-      if(!file) resolve(null);
+      if (!file) resolve(null);
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
@@ -49,7 +51,7 @@ const InputData = () => {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200; 
+          const MAX_WIDTH = 1200;
           const MAX_HEIGHT = 1200;
           let width = img.width;
           let height = img.height;
@@ -68,7 +70,7 @@ const InputData = () => {
           canvas.toBlob((blob) => {
             const newFile = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
             resolve(newFile);
-          }, 'image/jpeg', 0.7); 
+          }, 'image/jpeg', 0.7);
         };
         img.onerror = error => reject(error);
       };
@@ -76,10 +78,50 @@ const InputData = () => {
     });
   };
 
+  const enhanceTextWithAI = async () => {
+    if (!catatanText.trim()) return;
+
+    setIsEnhancing(true);
+
+    try {
+      const res = await fetch('/api/enhance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: catatanText })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setCatatanText(data.enhanced);
+
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Teks disempurnakan dengan AI ✨',
+        showConfirmButton: false,
+        timer: 3000
+      });
+    } catch (error) {
+      console.error('AI Error:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'AI Gagal Memproses',
+        text: error.message || 'Terjadi kesalahan saat menghubungi server AI.',
+      });
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    
+
     // Get all files from Documentation and Materi inputs
     const docsFileList = Array.from(e.target.file_dok.files);
     const materiFileList = Array.from(e.target.file_materi.files);
@@ -133,14 +175,15 @@ const InputData = () => {
       const result = await response.json();
 
       if (result.status === 'success') {
-        Swal.fire({title: 'Berhasil!', text: 'Laporan tersimpan.', icon: 'success', confirmButtonColor: '#1B3C73'});
+        Swal.fire({ title: 'Berhasil!', text: 'Laporan tersimpan.', icon: 'success', confirmButtonColor: '#1B3C73' });
         formRef.current.reset();
-        loadDashboardData(); 
+        setCatatanText('');
+        loadDashboardData();
       } else { throw new Error(result.message); }
 
     } catch (error) {
       console.error("Submission Error:", error);
-      Swal.fire({title: 'Gagal Menyimpan', text: 'Pastikan koneksi internet stabil atau kurangi ukuran file.', icon: 'error', confirmButtonColor: '#1B3C73'});
+      Swal.fire({ title: 'Gagal Menyimpan', text: 'Pastikan koneksi internet stabil atau kurangi ukuran file.', icon: 'error', confirmButtonColor: '#1B3C73' });
     } finally {
       setIsSubmitting(false);
     }
@@ -149,22 +192,22 @@ const InputData = () => {
   return (
     <div className="pt-16 lg:pt-0 relative">
       {isSubmitting && <LoaderOverlay />}
-      
+
       <div className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden max-w-4xl mx-auto transition-all duration-300 ${isSubmitting ? 'blur-sm pointer-events-none' : ''}`}>
         <div className="bg-[#1B3C73] px-6 py-4 border-b border-gray-100">
           <h2 className="text-xl font-bold text-white flex items-center">
             <FileSignature className="mr-3 text-[#F59E0B]" size={24} /> Formulir Laporan Penugasan
           </h2>
         </div>
-        
+
         <form ref={formRef} onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label htmlFor="in_bidang" className="block text-sm font-semibold text-gray-700">Bidang / Unit Kerja <span className="text-red-500">*</span></label>
-              <select 
-                name="bidang" 
-                id="in_bidang" 
-                required 
+              <select
+                name="bidang"
+                id="in_bidang"
+                required
                 value={selectedBidang}
                 onChange={(e) => setSelectedBidang(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2A5499] bg-gray-50 focus:bg-white transition outline-none"
@@ -222,19 +265,40 @@ const InputData = () => {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="in_catatan" className="block text-sm font-semibold text-gray-700">Catatan Hasil Kegiatan <span className="text-red-500">*</span></label>
-            <textarea name="catatan" id="in_catatan" rows="4" placeholder="Tuliskan poin-poin penting hasil kegiatan di sini..." required className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2A5499] bg-gray-50 focus:bg-white transition outline-none resize-y"></textarea>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-2 gap-2">
+              <label htmlFor="in_catatan" className="block text-sm font-semibold text-gray-700">Catatan Hasil Kegiatan <span className="text-red-500">*</span></label>
+              <button
+                type="button"
+                onClick={enhanceTextWithAI}
+                disabled={isEnhancing || !catatanText.trim() || isSubmitting}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-purple-600 hover:to-indigo-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                title="Perbaiki dan kembangkan poin kegiatan dengan AI"
+              >
+                {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Perbaiki Teks dengan AI
+              </button>
+            </div>
+            <textarea
+              name="catatan"
+              id="in_catatan"
+              rows="4"
+              value={catatanText}
+              onChange={(e) => setCatatanText(e.target.value)}
+              placeholder="Tuliskan poin-poin penting hasil kegiatan di sini. Ketik seadanya dan biarkan AI menyempurnakannya..."
+              required
+              className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#2A5499] bg-gray-50 focus:bg-white transition outline-none resize-y ${isEnhancing ? 'opacity-50' : ''}`}
+              disabled={isEnhancing || isSubmitting}
+            ></textarea>
           </div>
 
           <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="in_file_dok" className="block text-sm font-bold text-[#1B3C73] flex items-center gap-1"><Camera size={16}/> Dokumentasi (Foto)</label>
+              <label htmlFor="in_file_dok" className="block text-sm font-bold text-[#1B3C73] flex items-center gap-1"><Camera size={16} /> Dokumentasi (Foto)</label>
               <input multiple type="file" name="file_dok" id="in_file_dok" accept="image/*" className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#1B3C73] file:text-white hover:file:bg-[#0A2647] cursor-pointer border border-dashed border-gray-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-[#1B3C73]" />
               <p className="text-xs text-gray-500 mt-1">Bisa pilih lebih dari 1 foto. Sistem otomatis mengompres.</p>
             </div>
             <div className="space-y-2">
-              <label htmlFor="in_file_materi" className="block text-sm font-bold text-[#1B3C73] flex items-center gap-1"><FileText size={16}/> Materi (PDF/Docx) <span className="text-xs font-normal text-gray-500">- Opsional</span></label>
-              <input multiple type="file" name="file_materi" id="in_file_materi" accept=".pdf,.doc,.docx" className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 cursor-pointer border border-dashed border-gray-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-[#1B3C73]" />
+              <label htmlFor="in_file_materi" className="block text-sm font-bold text-[#1B3C73] flex items-center gap-1"><FileText size={16} /> Materi (PDF/Docx) <span className="text-xs font-normal text-gray-500">- Opsional</span></label>
+              <input multiple type="file" name="file_materi" id="in_file_materi" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 cursor-pointer border border-dashed border-gray-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-[#1B3C73]" />
               <p className="text-xs text-gray-500 mt-1">Bisa pilih lebih dari 1 file. Maks 5MB/file.</p>
             </div>
           </div>
