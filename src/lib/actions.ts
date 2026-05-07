@@ -1,7 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient } from './supabase'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
 import type { Pegawai, Laporan, DashboardStats, LaporanFormData } from './types'
 
 // ============================================================
@@ -9,6 +9,7 @@ import type { Pegawai, Laporan, DashboardStats, LaporanFormData } from './types'
 // ============================================================
 
 export async function getPegawai(): Promise<Pegawai[]> {
+  noStore()
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('pegawai')
@@ -25,6 +26,7 @@ export async function getPegawai(): Promise<Pegawai[]> {
 }
 
 export async function getLaporan(namaPegawai?: string): Promise<Laporan[]> {
+  noStore()
   const supabase = createServerSupabaseClient()
   let query = supabase
     .from('laporan')
@@ -46,6 +48,7 @@ export async function getLaporan(namaPegawai?: string): Promise<Laporan[]> {
 }
 
 export async function getAllLaporan(): Promise<Laporan[]> {
+  noStore()
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('laporan')
