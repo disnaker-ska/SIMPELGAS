@@ -34,6 +34,33 @@ function cleanTextHelper(str: string) {
   return str.toString().toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+// Ekstrak file ID dari berbagai format URL Google Drive/Docs
+function getDriveFileId(url: string): string | null {
+  const patterns = [
+    /[?&]id=([-\w]+)/,         // open?id= atau uc?export=view&id=
+    /\/file\/d\/([-\w]+)/,      // /file/d/FILE_ID/view
+    /\/d\/([-\w]+)/,            // /d/FILE_ID/ (Docs, Sheets, Slides)
+  ]
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
+  }
+  return null
+}
+
+// Cek apakah URL adalah Google Docs/Slides/Sheets (bukan file gambar)
+function isDriveDocument(url: string): boolean {
+  return url.includes('docs.google.com')
+}
+
+// Dapatkan URL thumbnail yang reliable untuk ditampilkan di <img>
+function getDriveThumbnailUrl(url: string): string | null {
+  if (isDriveDocument(url)) return null // Docs/Slides tidak bisa jadi img
+  const id = getDriveFileId(url)
+  if (!id) return null
+  return `https://drive.google.com/thumbnail?id=${id}&sz=w400`
+}
+
 export function PimpinanClient({ initialLaporan, pegawaiList }: PimpinanClientProps) {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -327,14 +354,38 @@ export function PimpinanClient({ initialLaporan, pegawaiList }: PimpinanClientPr
                       <h4 className="font-bold text-gray-700 text-xs mb-2 uppercase tracking-wide">Dokumentasi</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {lap.dokumentasi_urls && lap.dokumentasi_urls.length > 0 ? (
-                          lap.dokumentasi_urls.map((url, i) => (
-                            <a key={i} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-gray-200 hover:shadow-lg transition group relative bg-gray-50">
-                              <img src={url} className="w-full h-40 object-cover group-hover:scale-105 transition duration-300" alt={`Dokumentasi ${i + 1}`} />
-                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-white text-xs font-bold bg-black/50 px-2 py-1 rounded">Buka Foto</span>
-                              </div>
-                            </a>
-                          ))
+                          lap.dokumentasi_urls.map((url, i) => {
+                            const thumbnailUrl = getDriveThumbnailUrl(url)
+                            // Jika bisa ditampilkan sebagai gambar
+                            if (thumbnailUrl) {
+                              return (
+                                <a key={i} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-gray-200 hover:shadow-lg transition group relative bg-gray-50">
+                                  <img
+                                    src={thumbnailUrl}
+                                    className="w-full h-40 object-cover group-hover:scale-105 transition duration-300"
+                                    alt={`Dokumentasi ${i + 1}`}
+                                    onError={(e) => {
+                                      // Fallback: tampilkan tombol link jika gambar gagal dimuat
+                                      const parent = (e.target as HTMLImageElement).closest('a')
+                                      if (parent) {
+                                        parent.className = 'flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition shadow-sm'
+                                        parent.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Lihat Dokumentasi ${i + 1}`
+                                      }
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold bg-black/50 px-2 py-1 rounded">Buka Foto</span>
+                                  </div>
+                                </a>
+                              )
+                            }
+                            // Fallback untuk URL yang tidak bisa jadi gambar (mis. Docs/Slides)
+                            return (
+                              <a key={i} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition shadow-sm">
+                                <FileDown size={14} /> Lihat Dokumentasi {lap.dokumentasi_urls!.length > 1 ? i + 1 : ''}
+                              </a>
+                            )
+                          })
                         ) : (
                           <span className="text-gray-400 text-xs italic">Tidak ada foto</span>
                         )}
@@ -382,11 +433,10 @@ export function PimpinanClient({ initialLaporan, pegawaiList }: PimpinanClientPr
 
                   <div className="text-right mt-2 border-t pt-4">
                     <button
-                      className={`font-bold py-2.5 px-6 rounded-lg transition shadow text-sm flex items-center justify-center ml-auto ${
-                        savingRow === lap.id
+                      className={`font-bold py-2.5 px-6 rounded-lg transition shadow text-sm flex items-center justify-center ml-auto ${savingRow === lap.id
                           ? 'bg-amber-300 text-navy-dark cursor-not-allowed'
                           : 'bg-amber-main hover:bg-amber-hover text-navy-dark'
-                      }`}
+                        }`}
                       onClick={() => simpanCatatan(lap.id)}
                       disabled={savingRow !== null}
                     >
