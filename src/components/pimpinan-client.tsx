@@ -26,16 +26,18 @@ function cleanTextHelper(str: string) {
   return str.toString().toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-// Ekstrak file ID dari berbagai format URL Google Drive/Docs
+// Ekstrak file ID dari berbagai format URL Google Drive
 function getDriveFileId(url: string): string | null {
   const patterns = [
-    /[?&]id=([-\w]{25,})/,         // open?id= atau uc?id= (min 25 char)
-    /\/file\/d\/([-\w]{25,})/,      // /file/d/FILE_ID/view
-    /\/d\/([-\w]{25,})/,            // /d/FILE_ID/ (Docs, Sheets, Slides)
+    /[?&]id=([-\w]+)/,           // ?id= atau &id= (open, uc?export=view, dsb)
+    /\/file\/d\/([-\w]+)/,       // /file/d/FILE_ID/view
+    /\/d\/([-\w]+)/,             // /d/FILE_ID/ (Docs, Slides, Sheets)
+    /\/uc\?.*?id=([-\w]+)/,      // uc?export=view&id= (format lama GAS)
   ]
   for (const pattern of patterns) {
     const match = url.match(pattern)
-    if (match) return match[1]
+    // Pastikan ID minimal 10 karakter agar tidak salah tangkap parameter pendek
+    if (match && match[1].length >= 10) return match[1]
   }
   return null
 }
@@ -60,7 +62,7 @@ function getImageSrc(url: string): string | null {
 
   // Google Drive file — gunakan Thumbnail API
   const id = getDriveFileId(url)
-  if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`
+  if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w600`
 
   return null
 }
@@ -340,10 +342,15 @@ export function PimpinanClient({ initialLaporan, pegawaiList, session }: Pimpina
                                     className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                                     alt={`Dokumentasi ${i + 1}`}
                                     onError={(e) => {
-                                      const parent = (e.target as HTMLImageElement).closest('a')
+                                      // Jika thumbnail gagal, ganti src ke icon placeholder agar tidak merusak layout
+                                      const img = e.target as HTMLImageElement
+                                      img.style.display = 'none'
+                                      const parent = img.parentElement
                                       if (parent) {
-                                        parent.className = 'flex items-center justify-center p-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl text-xs font-bold hover:bg-blue-100 transition shadow-sm aspect-video'
-                                        parent.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Lihat Foto`
+                                        const fallback = document.createElement('div')
+                                        fallback.className = 'absolute inset-0 flex flex-col items-center justify-center bg-gray-50 text-gray-400 text-[10px]'
+                                        fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Buka Manual'
+                                        parent.appendChild(fallback)
                                       }
                                     }}
                                   />

@@ -41,10 +41,70 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
     setIsLoading(false)
   }
 
+  const getDriveFileId = (url: string): string | null => {
+    const patterns = [
+      /[?&]id=([-\w]+)/,           // ?id= atau &id= (open, uc?export=view, dsb)
+      /\/file\/d\/([-\w]+)/,       // /file/d/FILE_ID/view
+      /\/d\/([-\w]+)/,             // /d/FILE_ID/ (Docs, Slides, Sheets)
+      /\/uc\?.*?id=([-\w]+)/,      // uc?export=view&id= (format lama GAS)
+    ]
+    for (const p of patterns) {
+      const match = url.match(p)
+      // Pastikan ID minimal 10 karakter agar tidak salah tangkap parameter pendek
+      if (match && match[1].length >= 10) return match[1]
+    }
+    return null
+  }
+
+  const getImageSrc = (url: string): string | null => {
+    if (url.includes('.supabase.co/storage/')) return url
+    if (url.includes('/presentation/') || url.includes('/document/') || url.includes('/spreadsheets/')) return null
+    const id = getDriveFileId(url)
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w600`
+    return null
+  }
+
+  // Merapikan teks yang diinput manual (bullets, spasi berlebih) menjadi HTML yang rapi
+  const formatRichText = (text: string) => {
+    if (!text || text === '-') return '-'
+    
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+    let html = ''
+    let inList = false
+
+    lines.forEach(line => {
+      // Cek apakah baris diawali dengan bullet manual: -, *, atau •
+      const isBullet = line.startsWith('-') || line.startsWith('*') || line.startsWith('•')
+      
+      if (isBullet) {
+        if (!inList) {
+          html += '<ul style="margin: 0 0 10px 0; padding-left: 20px; text-align: justify;">'
+          inList = true
+        }
+        // Ambil teks setelah tanda bullet
+        const content = line.substring(1).trim()
+        html += `<li style="margin-bottom: 5px;">${content}</li>`
+      } else {
+        if (inList) {
+          html += '</ul>'
+          inList = false
+        }
+        html += `<p style="margin: 0 0 10px 0; text-align: justify;">${line}</p>`
+      }
+    })
+
+    if (inList) html += '</ul>'
+    return html || '-'
+  }
+
   const prosesCetak = (lap: Laporan) => {
     const logoUrl = window.location.origin + '/Pemkot.png'
     const pegawaiNama = lap.pegawai?.nama || '-'
-    const tanggal = lap.tanggal_kegiatan ? new Date(lap.tanggal_kegiatan).toLocaleDateString('id-ID') : '-'
+    const tanggal = lap.tanggal_kegiatan ? new Date(lap.tanggal_kegiatan).toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }) : '-'
 
     const oldIframe = document.getElementById('print-iframe')
     if (oldIframe) document.body.removeChild(oldIframe)
@@ -60,32 +120,50 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Cetak Laporan</title>
+          <title>Laporan Penugasan - ${pegawaiNama}</title>
           <style>
             @media print {
-              @page { size: A4 portrait; margin: 20mm; }
+              @page { size: A4 portrait; margin: 30mm 25mm; }
               body { margin: 0; padding: 0; }
-              .anti-potong { page-break-inside: avoid; break-inside: avoid; }
+              .page-break { page-break-before: always; }
+              .anti-potong { page-break-inside: avoid; }
             }
-            body { font-family: 'Times New Roman', Times, serif; font-size: 14px; padding: 20mm; background: white; color: black; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 20px; }
-            td { padding: 4px 0; vertical-align: top; }
+            body { font-family: 'Arial', 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: black; padding: 25mm; }
+            .header { display: flex; align-items: center; border-bottom: 3.5px double black; padding-bottom: 10px; margin-bottom: 20px; }
+            .header-text { flex-grow: 1; text-align: center; }
+            .header-text h3 { margin: 0; font-size: 14pt; font-weight: normal; }
+            .header-text h2 { margin: 2px 0; font-size: 16pt; font-weight: bold; }
+            .header-text p { margin: 0; font-size: 9pt; }
+            
+            .content-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            .content-table td { padding: 4px 0; vertical-align: top; }
+            .section-title { font-weight: bold; margin-top: 35px; margin-bottom: 8px; border-bottom: 1px solid #eee; display: block; }
+            
+            .doc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 10px; }
+            .doc-item { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; page-break-inside: avoid; }
+            .doc-item img { width: 100%; height: 180px; object-fit: cover; display: block; }
+            
+            .materi-list { margin-top: 10px; padding-left: 20px; font-size: 9pt; }
+            .materi-list li { margin-bottom: 5px; color: #444; word-break: break-all; }
+            
+            .signature { margin-top: 50px; float: right; width: 250px; text-align: center; }
           </style>
         </head>
-        <body onload="setTimeout(function() { window.focus(); window.print(); }, 500);">
-          <div style="display: flex; align-items: center; border-bottom: 3px solid black; margin-bottom: 2px; padding-bottom: 10px;">
-            <img src="${logoUrl}" style="width: 80px; height: auto; flex-shrink: 0;" />
-            <div style="flex-grow: 1; text-align: center;">
-              <h3 style="margin: 0; font-size: 16pt; font-weight: normal;">PEMERINTAH KOTA SURAKARTA</h3>
-              <h2 style="margin: 2px 0; font-size: 20pt; font-weight: bold; letter-spacing: 1px;">DINAS TENAGA KERJA</h2>
-              <p style="margin: 0; font-size: 10pt;">Jalan Slamet Riyadi No. 306, Kota Surakarta, Kodepos 57141</p>
-              <p style="margin: 0; font-size: 10pt;">Telepon: (0271) 714902 | Email: disnaker@surakarta.go.id</p>
+        <body onload="setTimeout(function() { window.focus(); window.print(); }, 800);">
+          <div class="header">
+            <img src="${logoUrl}" style="width: 70px; height: auto;" />
+            <div class="header-text">
+              <h3>PEMERINTAH KOTA SURAKARTA</h3>
+              <h2>DINAS TENAGA KERJA</h2>
+              <p>Jalan Slamet Riyadi No. 306, Kota Surakarta, Kodepos 57141</p>
+              <p>Telepon: (0271) 714902 | Email: disnaker@surakarta.go.id</p>
             </div>
-            <div style="width: 80px; flex-shrink: 0;"></div>
+            <div style="width: 70px;"></div>
           </div>
-          <div style="border-top: 1px solid black; margin-bottom: 20px; padding-top: 2px;"></div>
-          <h3 style="text-align:center; text-decoration:underline; font-weight:bold;">LAPORAN HASIL PENUGASAN</h3>
-          <table>
+
+          <h3 style="text-align:center; text-decoration:underline; font-weight:bold; margin-bottom: 25px;">LAPORAN HASIL PENUGASAN</h3>
+          
+          <table class="content-table">
             <tr><td style="width:28%">Nama Pegawai</td><td style="width:2%">:</td><td><strong>${pegawaiNama}</strong></td></tr>
             <tr><td>Bidang / Unit Kerja</td><td>:</td><td>${lap.bidang || '-'}</td></tr>
             <tr><td>Nama Kegiatan</td><td>:</td><td>${lap.nama_kegiatan || '-'}</td></tr>
@@ -94,18 +172,54 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
             <tr><td>Penyelenggara</td><td>:</td><td>${lap.penyelenggara || '-'}</td></tr>
             <tr><td>Tamu Undangan</td><td>:</td><td>${lap.tamu_undangan || '-'}</td></tr>
           </table>
-          <h4 style="margin-bottom: 5px;">A. Hasil Kegiatan:</h4>
-          <p style="text-align:justify; white-space: pre-wrap;">${lap.catatan_hasil || '-'}</p>
+
           <div class="anti-potong">
-            <h4 style="margin-bottom: 5px;">B. Tindak Lanjut:</h4>
-            <p style="text-align:justify;">${lap.status_tindak_lanjut || '-'}</p>
-            <h4 style="margin-bottom: 5px;">C. Catatan Pimpinan:</h4>
-            <p style="text-align:justify; white-space: pre-wrap;">${lap.catatan_pimpinan || '-'}</p>
-            <div style="float: right; width: 250px; text-align: center; margin-top: 40px;">
+            <span class="section-title">A. Hasil Kegiatan:</span>
+            <div style="margin-top: 5px;">${formatRichText(lap.catatan_hasil || '-')}</div>
+          </div>
+
+          <div class="anti-potong">
+            <span class="section-title">B. Tindak Lanjut:</span>
+            <p style="text-align:justify; margin-top: 5px;">${lap.status_tindak_lanjut || '-'}</p>
+          </div>
+
+          <div class="anti-potong">
+            <span class="section-title">C. Catatan Pimpinan:</span>
+            <div style="margin-top: 5px;">${formatRichText(lap.catatan_pimpinan || '-')}</div>
+          </div>
+
+          ${lap.dokumentasi_urls && lap.dokumentasi_urls.length > 0 ? `
+            <div class="anti-potong">
+              <span class="section-title">D. Lampiran Dokumentasi:</span>
+              <div class="doc-grid">
+                ${lap.dokumentasi_urls.map(url => {
+                  const src = getImageSrc(url);
+                  return src ? `
+                    <div class="doc-item">
+                      <img src="${src}" alt="Dokumentasi" />
+                    </div>
+                  ` : `<div class="doc-item" style="padding: 20px; font-size: 8pt; background: #f9f9f9;">Link Dokumen: <br/> ${url}</div>`
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${lap.materi_urls && lap.materi_urls.length > 0 ? `
+            <div class="anti-potong">
+              <span class="section-title">E. Materi Pendukung:</span>
+              <ul class="materi-list">
+                ${lap.materi_urls.map(url => `<li>${url}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          <div class="anti-potong">
+            <div class="signature">
               <p>Surakarta, ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
               <p>Pegawai yang ditugaskan,</p><br/><br/><br/><br/>
               <p><strong><u>${pegawaiNama}</u></strong></p>
-            </div><div style="clear:both;"></div>
+            </div>
+            <div style="clear:both;"></div>
           </div>
         </body>
       </html>
