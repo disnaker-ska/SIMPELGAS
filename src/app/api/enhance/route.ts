@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
     const prompt = `Anda adalah asisten AI profesional untuk penyusunan laporan kegiatan instansi pemerintah Kota Surakarta. Perbaiki dan kembangkan poin-poin catatan laporan kegiatan berikut. Buat menjadi paragraf deskriptif yang rapi, profesional, terstruktur, serta perbaiki typo ejaan (jika ada). Jangan mengubah esensi, angka, nama, atau konteks utamanya sedikitpun. Hanya buat bahasanya lebih formal dan pantas dibaca oleh pimpinan. Jangan menggunakan tanda kutip markdown untuk output ini, langsung teks biasa.\n\nTeks asli tulisan pengguna:\n${text}`
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`
 
 
     const apiRes = await fetch(url, {
