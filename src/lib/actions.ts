@@ -226,28 +226,62 @@ export async function getLaporanByPegawaiId(pegawaiId: string): Promise<Laporan[
   return data || []
 }
 // ============================================================
-// PIMPINAN AUTHENTICATION (SERVER SIDE ONLY)
+// PIMPINAN AUTHENTICATION (SERVER SIDE + COOKIES)
 // ============================================================
 
-export async function verifyPimpinanPin(roleName: string, pin: string) {
-  // Konfigurasi ini hanya hidup di server
-  const PIMPINAN_ROLES_CONFIG = [
-    { name: 'Kepala Dinas', pin: process.env.PIN_KEPALA_DINAS || '123456', scopes: ['ALL'] },
-    { name: 'Sekretaris', pin: process.env.PIN_SEKRETARIS || '123456', scopes: ['ALL'] },
-    { name: 'Kasubag Perkeu', pin: process.env.PIN_KASUBAG_PERKEU || '123456', scopes: ['SEKRETARIAT'] },
-    { name: 'Kasubag Ako', pin: process.env.PIN_KASUBAG_AKO || '123456', scopes: ['SEKRETARIAT'] },
-    { name: 'Kabid PPTK', pin: process.env.PIN_KABID_PPTK || '123456', scopes: ['BIDANG PPTK'] },
-    { name: 'Kabid Hubungan Industrial', pin: process.env.PIN_KABID_HI || '123456', scopes: ['BIDANG HUBUNGAN INDUSTRIAL'] },
-  ]
+import { cookies } from 'next/headers'
 
+const PIMPINAN_ROLES_CONFIG = [
+  { name: 'Kepala Dinas', pin: process.env.PIN_KEPALA_DINAS, scopes: ['ALL'] },
+  { name: 'Sekretaris', pin: process.env.PIN_SEKRETARIS, scopes: ['ALL'] },
+  { name: 'Kasubag Perkeu', pin: process.env.PIN_KASUBAG_PERKEU, scopes: ['SEKRETARIAT'] },
+  { name: 'Kasubag Ako', pin: process.env.PIN_KASUBAG_AKO, scopes: ['SEKRETARIAT'] },
+  { name: 'Kabid PPTK', pin: process.env.PIN_KABID_PPTK, scopes: ['BIDANG PPTK'] },
+  { name: 'Kabid Hubungan Industrial', pin: process.env.PIN_KABID_HI, scopes: ['BIDANG HUBUNGAN INDUSTRIAL'] },
+]
+
+export async function loginPimpinan(roleName: string, pin: string) {
   const role = PIMPINAN_ROLES_CONFIG.find(r => r.name === roleName)
-  
-  if (!role || pin !== role.pin) {
+
+  // Jika env variable tidak di-set, tolak login dan log error — jangan fallback diam-diam
+  if (!role || !role.pin) {
+    console.error(`[AUTH] PIN untuk role "${roleName}" tidak ditemukan di environment variables.`)
+    return { success: false, message: 'Konfigurasi server belum lengkap. Hubungi administrator.' }
+  }
+
+  if (pin !== role.pin) {
     return { success: false, message: 'PIN Salah atau Jabatan tidak ditemukan.' }
   }
 
-  return { 
-    success: true, 
-    scopes: role.scopes 
+  // Set httpOnly cookie (tidak bisa diakses JS browser)
+  const cookieStore = await cookies()
+  cookieStore.set('pimpinan_session', JSON.stringify({
+    role: role.name,
+    scopes: role.scopes
+  }), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 8, // 8 Jam
+    path: '/',
+  })
+
+  return { success: true }
+}
+
+export async function logoutPimpinan() {
+  const cookieStore = await cookies()
+  cookieStore.delete('pimpinan_session')
+  revalidatePath('/pimpinan')
+}
+
+export async function getPimpinanSession() {
+  const cookieStore = await cookies()
+  const session = cookieStore.get('pimpinan_session')
+  if (!session) return null
+  try {
+    return JSON.parse(session.value) as { role: string; scopes: string[] }
+  } catch {
+    return null
   }
 }
