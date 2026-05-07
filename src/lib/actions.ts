@@ -225,3 +225,29 @@ export async function getLaporanByPegawaiId(pegawaiId: string): Promise<Laporan[
   }
   return data || []
 }
+// ============================================================
+// PIMPINAN AUTHENTICATION (SERVER SIDE ONLY)
+// ============================================================
+
+export async function verifyPimpinanPin(roleName: string, pin: string) {
+  // Konfigurasi ini hanya hidup di server
+  const PIMPINAN_ROLES_CONFIG = [
+    { name: 'Kepala Dinas', pin: process.env.PIN_KEPALA_DINAS || '123456', scopes: ['ALL'] },
+    { name: 'Sekretaris', pin: process.env.PIN_SEKRETARIS || '123456', scopes: ['ALL'] },
+    { name: 'Kasubag Perkeu', pin: process.env.PIN_KASUBAG_PERKEU || '123456', scopes: ['SEKRETARIAT'] },
+    { name: 'Kasubag Ako', pin: process.env.PIN_KASUBAG_AKO || '123456', scopes: ['SEKRETARIAT'] },
+    { name: 'Kabid PPTK', pin: process.env.PIN_KABID_PPTK || '123456', scopes: ['BIDANG PPTK'] },
+    { name: 'Kabid Hubungan Industrial', pin: process.env.PIN_KABID_HI || '123456', scopes: ['BIDANG HUBUNGAN INDUSTRIAL'] },
+  ]
+
+  const role = PIMPINAN_ROLES_CONFIG.find(r => r.name === roleName)
+  
+  if (!role || pin !== role.pin) {
+    return { success: false, message: 'PIN Salah atau Jabatan tidak ditemukan.' }
+  }
+
+  return { 
+    success: true, 
+    scopes: role.scopes 
+  }
+}

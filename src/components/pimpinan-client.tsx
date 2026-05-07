@@ -7,16 +7,16 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import Swal from 'sweetalert2'
-import { updateEvaluasiPimpinan } from '@/lib/actions'
+import { updateEvaluasiPimpinan, verifyPimpinanPin } from '@/lib/actions'
 import type { Laporan, Pegawai } from '@/lib/types'
 
-const PIMPINAN_ROLES = [
-  { name: 'Kepala Dinas', pin: '123456', scopes: ['ALL'] },
-  { name: 'Sekretaris', pin: '123456', scopes: ['ALL'] },
-  { name: 'Kasubag Perkeu', pin: '123456', scopes: ['SEKRETARIAT'] },
-  { name: 'Kasubag Ako', pin: '123456', scopes: ['SEKRETARIAT'] },
-  { name: 'Kabid PPTK', pin: '123456', scopes: ['BIDANG PPTK'] },
-  { name: 'Kabid Hubungan Industrial', pin: '123456', scopes: ['BIDANG HUBUNGAN INDUSTRIAL'] },
+const PIMPINAN_ROLES_NAMES = [
+  'Kepala Dinas',
+  'Sekretaris',
+  'Kasubag Perkeu',
+  'Kasubag Ako',
+  'Kabid PPTK',
+  'Kabid Hubungan Industrial',
 ]
 
 interface PimpinanClientProps {
@@ -107,21 +107,36 @@ export function PimpinanClient({ initialLaporan, pegawaiList }: PimpinanClientPr
         }))
       )
     }
-  }, [initialLaporan, isAuthenticated, activeRole])
+  }, [initialLaporan, isAuthenticated, activeRole, activeScopes])
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeRole) {
-      Swal.fire({ icon: 'warning', title: 'Pilih Jabatan', text: 'Tentukan jabatan Anda terlebih dahulu.' })
+      Swal.fire({ icon: 'warning', title: 'Pilih Jabatan', text: 'Silakan pilih jabatan Anda terlebih dahulu.' })
       return
     }
-    const roleSetup = PIMPINAN_ROLES.find((r) => r.name === activeRole)
-    if (roleSetup && pin === roleSetup.pin) {
+
+    setIsLoading(true)
+    const res = await verifyPimpinanPin(activeRole, pin)
+    setPin('')
+    setIsLoading(false)
+
+    if (res.success) {
       setIsAuthenticated(true)
-      setPin('')
+      setActiveScopes(res.scopes || [])
+      Swal.fire({
+        icon: 'success',
+        title: 'Akses Diberikan',
+        text: `Selamat datang, ${activeRole}!`,
+        timer: 1500,
+        showConfirmButton: false
+      })
     } else {
-      Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'PIN Salah!' })
-      setPin('')
+      Swal.fire({
+        icon: 'error',
+        title: 'Akses Ditolak',
+        text: res.message || 'PIN yang Anda masukkan salah.'
+      })
     }
   }
 
@@ -175,16 +190,14 @@ export function PimpinanClient({ initialLaporan, pegawaiList }: PimpinanClientPr
 
   const exportRecap = async (format: 'xlsx' | 'pdf') => {
     if (!initialLaporan || initialLaporan.length === 0) return
-    const roleSetup = PIMPINAN_ROLES.find((r) => r.name === activeRole)
-    if (!roleSetup) return
-
+    
     setIsExporting(true)
     Swal.fire({ title: 'Menyiapkan Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
 
     try {
       const dataForRecap = initialLaporan.filter((lap) => {
         const lapBidangUpper = (lap.bidang || '').toUpperCase()
-        if (!roleSetup.scopes.includes('ALL') && !roleSetup.scopes.includes(lapBidangUpper)) return false
+        if (!activeScopes.includes('ALL') && !activeScopes.includes(lapBidangUpper)) return false
         if (lapBidangUpper === 'KEPALA DINAS') return false
         if (activeRole.includes('Kasubag') && (lap.jabatan || '').toUpperCase() !== 'STAFF') return false
         return true
@@ -258,7 +271,9 @@ export function PimpinanClient({ initialLaporan, pegawaiList }: PimpinanClientPr
               className="w-full px-4 py-3 mb-4 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-amber-main outline-none font-semibold text-navy-main"
             >
               <option value="">-- Pilih Jabatan --</option>
-              {PIMPINAN_ROLES.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+              {PIMPINAN_ROLES_NAMES.map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
             </select>
             <input
               ref={pinInputRef}
