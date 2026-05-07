@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import {
-  PieChart,
+  LayoutDashboard as DashboardIcon,
   Table,
   RefreshCw,
   Calendar,
@@ -11,6 +11,14 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+} from 'recharts'
 import { useRouter } from 'next/navigation'
 import type { Laporan, DashboardStats, Pegawai } from '@/lib/types'
 
@@ -154,7 +162,7 @@ export function DashboardClient({
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <h2 className="text-2xl font-bold text-navy-main flex items-center">
-          <PieChart className="mr-3 text-amber-main" size={28} /> Statistik Laporan ASN
+          <DashboardIcon className="mr-3 text-amber-main" size={28} /> Statistik Laporan ASN
         </h2>
         <button
           onClick={handleRefresh}
@@ -228,46 +236,65 @@ export function DashboardClient({
 
       {/* Charts Placeholder — will use Recharts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pie Chart Distribusi per Bidang */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-          <h3 className="font-bold text-navy-main mb-6 text-center">Distribusi per Bidang</h3>
-          <div className="h-64 flex items-center justify-center">
+          <h3 className="font-bold text-navy-main mb-4 text-center">Distribusi per Bidang</h3>
+          <div className="h-64 w-full">
             {chartsData.bidang.length > 0 ? (
-              <div className="w-full space-y-2">
-                {chartsData.bidang.map((item, i) => (
-                  <div key={item.name} className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                    <span className="text-sm flex-1 truncate">{item.name}</span>
-                    <span className="text-sm font-bold text-navy-main">{item.value}</span>
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div className="h-2 rounded-full" style={{ width: `${(item.value / Math.max(...chartsData.bidang.map(b => b.value))) * 100}%`, backgroundColor: COLORS[i % COLORS.length] }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartsData.bidang}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {chartsData.bidang.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-sm">Belum ada data</p>
+              <div className="h-full flex items-center justify-center">
+                <p className="text-gray-400 text-sm">Belum ada data</p>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Scrollable List Jenis Kegiatan */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-          <h3 className="font-bold text-navy-main mb-6 text-center">Berdasarkan Jenis Kegiatan</h3>
-          <div className="h-64 flex items-center justify-center">
+          <h3 className="font-bold text-navy-main mb-4 text-center">Berdasarkan Jenis Kegiatan</h3>
+          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
             {chartsData.jenis.length > 0 ? (
-              <div className="w-full space-y-3">
-                {chartsData.jenis.map((item, i) => (
+              <div className="space-y-4">
+                {chartsData.jenis.sort((a, b) => b.value - a.value).map((item, i) => (
                   <div key={item.name}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="truncate">{item.name}</span>
+                    <div className="flex justify-between text-sm mb-1 font-medium">
+                      <span className="text-gray-700 truncate mr-2" title={item.name}>{item.name}</span>
                       <span className="font-bold text-navy-main">{item.value}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-4">
-                      <div className="h-4 rounded-full bg-navy-main transition-all" style={{ width: `${(item.value / Math.max(...chartsData.jenis.map(j => j.value))) * 100}%` }} />
+                    <div className="w-full bg-gray-100 rounded-full h-2.5">
+                      <div 
+                        className="h-2.5 rounded-full bg-navy-main transition-all duration-1000" 
+                        style={{ width: `${(item.value / Math.max(...chartsData.jenis.map(j => j.value))) * 100}%` }} 
+                      />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-400 text-sm">Belum ada data</p>
+              <div className="h-64 flex items-center justify-center">
+                <p className="text-gray-400 text-sm">Belum ada data</p>
+              </div>
             )}
           </div>
         </div>

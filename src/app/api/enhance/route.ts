@@ -16,7 +16,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const prompt = `Anda adalah asisten AI profesional untuk penyusunan laporan kegiatan instansi pemerintah Kota Surakarta. Perbaiki dan kembangkan poin-poin catatan laporan kegiatan berikut. Buat menjadi paragraf deskriptif yang rapi, profesional, terstruktur, serta perbaiki typo ejaan (jika ada). Jangan mengubah esensi, angka, nama, atau konteks utamanya sedikitpun. Hanya buat bahasanya lebih formal dan pantas dibaca oleh pimpinan. Jangan menggunakan tanda kutip markdown untuk output ini, langsung teks biasa.\n\nTeks asli tulisan pengguna:\n${text}`
+    const prompt = `Anda adalah asisten AI profesional untuk penyusunan laporan kegiatan instansi pemerintah Kota Surakarta. Tugas Anda adalah memperbaiki dan mengembangkan catatan laporan kegiatan berikut agar lebih formal, profesional, dan rapi. 
+
+Aturan:
+1. Perbaiki typo, ejaan, dan tata bahasa (gunakan bahasa Indonesia yang sangat formal/kedinasan).
+2. PERTAHANKAN struktur poin-poin (bullet points) jika input asli menggunakan poin-poin. Jangan digabung menjadi satu paragraf jika inputnya terstruktur.
+3. Jangan mengubah esensi, angka, tanggal, nama orang, atau instansi sedikitpun.
+4. Jangan gunakan tanda kutip markdown atau format tebal/miring, berikan teks bersih.
+5. Buat kalimatnya lebih mengalir tapi tetap singkat dan padat.
+
+Teks asli dari pengguna:
+${text}`
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`
 
