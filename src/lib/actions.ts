@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from './supabase'
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
-import type { Pegawai, Laporan, DashboardStats, LaporanFormData } from './types'
+import type { Pegawai, Laporan, DashboardStats, LaporanFormData, KegiatanInternal, KegiatanInternalFormData } from './types'
 
 // ============================================================
 // DATA FETCHING
@@ -225,6 +225,145 @@ export async function getLaporanByPegawaiId(pegawaiId: string): Promise<Laporan[
   }
   return data || []
 }
+// ============================================================
+// KEGIATAN INTERNAL — CRUD
+// ============================================================
+
+function calculateSpjStatus(
+  daftarHadir: string[],
+  undangan: string[],
+  fotoKegiatan: string[],
+  notulen: string[],
+  fotoJamuan: string[]
+): string {
+  const fields = [daftarHadir, undangan, fotoKegiatan, notulen, fotoJamuan]
+  const filled = fields.filter(f => f && f.length > 0).length
+  if (filled === 0) return 'Belum Lengkap'
+  if (filled === 5) return 'Lengkap'
+  return 'Sebagian'
+}
+
+export async function submitKegiatanInternal(
+  formData: KegiatanInternalFormData,
+  daftarHadirUrls: string[],
+  undanganUrls: string[],
+  fotoKegiatanUrls: string[],
+  notulenUrls: string[],
+  fotoJamuanUrls: string[]
+) {
+  const supabase = createServerSupabaseClient()
+
+  const statusSpj = calculateSpjStatus(
+    daftarHadirUrls, undanganUrls, fotoKegiatanUrls, notulenUrls, fotoJamuanUrls
+  )
+
+  const { data, error } = await supabase
+    .from('kegiatan_internal')
+    .insert({
+      jenis_kegiatan: formData.jenis_kegiatan,
+      nama_kegiatan: formData.nama_kegiatan,
+      tanggal_kegiatan: formData.tanggal_kegiatan,
+      waktu_mulai: formData.waktu_mulai || null,
+      waktu_selesai: formData.waktu_selesai || null,
+      tempat_kegiatan: formData.tempat_kegiatan,
+      bidang: formData.bidang,
+      pic_pegawai_id: formData.pic_pegawai_id || null,
+      agenda: formData.agenda || null,
+      hasil_kegiatan: formData.hasil_kegiatan || null,
+      peserta: formData.peserta || null,
+      jumlah_peserta: formData.jumlah_peserta || null,
+      daftar_hadir_urls: daftarHadirUrls.length > 0 ? daftarHadirUrls : null,
+      undangan_urls: undanganUrls.length > 0 ? undanganUrls : null,
+      foto_kegiatan_urls: fotoKegiatanUrls.length > 0 ? fotoKegiatanUrls : null,
+      notulen_urls: notulenUrls.length > 0 ? notulenUrls : null,
+      foto_jamuan_urls: fotoJamuanUrls.length > 0 ? fotoJamuanUrls : null,
+      status_spj: statusSpj,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error submitting kegiatan internal:', error)
+    return { status: 'error', message: error.message }
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/input/monitoring')
+  revalidatePath('/pimpinan')
+
+  return { status: 'success', data }
+}
+
+export async function getAllKegiatanInternal(): Promise<KegiatanInternal[]> {
+  noStore()
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('kegiatan_internal')
+    .select('*, pegawai:pic_pegawai_id(nama, bidang, jabatan)')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching kegiatan internal:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function getKegiatanInternalById(id: string): Promise<KegiatanInternal | null> {
+  noStore()
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('kegiatan_internal')
+    .select('*, pegawai:pic_pegawai_id(nama, bidang, jabatan)')
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    console.error('Error fetching kegiatan internal by id:', error)
+    return null
+  }
+  return data
+}
+
+export async function updateEvaluasiKegiatanInternal(
+  kegiatanId: string,
+  catatanBaru: string,
+  roleName: string
+) {
+  const supabase = createServerSupabaseClient()
+
+  // Fetch current catatan to append
+  const { data: current } = await supabase
+    .from('kegiatan_internal')
+    .select('catatan_pimpinan')
+    .eq('id', kegiatanId)
+    .single()
+
+  const existingNotes = current?.catatan_pimpinan
+    ? current.catatan_pimpinan.trim() + '\n\n'
+    : ''
+  const appendedNote = existingNotes + `[${roleName}]: ${catatanBaru.trim()}`
+
+  const { error } = await supabase
+    .from('kegiatan_internal')
+    .update({
+      catatan_pimpinan: appendedNote,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', kegiatanId)
+
+  if (error) {
+    console.error('Error updating evaluasi kegiatan internal:', error)
+    return { status: 'error', message: error.message }
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/pimpinan')
+  revalidatePath('/input/monitoring')
+
+  return { status: 'success' }
+}
+
 // ============================================================
 // PIMPINAN AUTHENTICATION (SERVER SIDE + COOKIES)
 // ============================================================

@@ -61,3 +61,45 @@ export interface LaporanFormData {
   tamu_undangan: string
   catatan_hasil: string
 }
+
+export interface KegiatanInternal {
+  id: string
+  jenis_kegiatan: string
+  nama_kegiatan: string
+  tanggal_kegiatan: string
+  waktu_mulai: string | null
+  waktu_selesai: string | null
+  tempat_kegiatan: string
+  bidang: string
+  pic_pegawai_id: string | null
+  agenda: string | null
+  hasil_kegiatan: string | null
+  peserta: string | null
+  jumlah_peserta: number | null
+  daftar_hadir_urls: string[] | null
+  undangan_urls: string[] | null
+  foto_kegiatan_urls: string[] | null
+  notulen_urls: string[] | null
+  foto_jamuan_urls: string[] | null
+  status_spj: string
+  catatan_pimpinan: string | null
+  created_at: string
+  updated_at: string
+  // Joined fields
+  pegawai?: Pegawai
+}
+
+export interface KegiatanInternalFormData {
+  jenis_kegiatan: string
+  nama_kegiatan: string
+  tanggal_kegiatan: string
+  waktu_mulai: string
+  waktu_selesai: string
+  tempat_kegiatan: string
+  bidang: string
+  pic_pegawai_id: string
+  agenda: string
+  hasil_kegiatan: string
+  peserta: string
+  jumlah_peserta: number | null
+}

@@ -11,11 +11,13 @@ import {
   Building2,
   Menu,
   X,
+  ClipboardList,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/input', label: 'Input Data', icon: FileEdit },
+  { href: '/input', label: 'Input Penugasan', icon: FileEdit },
+  { href: '/input/monitoring', label: 'Monitoring Internal', icon: ClipboardList },
   { href: '/cetak', label: 'Cetak', icon: Printer },
 ]
 
