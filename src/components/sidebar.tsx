@@ -17,7 +17,7 @@ import {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/input', label: 'Input Penugasan', icon: FileEdit },
-  { href: '/input/monitoring', label: 'Monitoring Internal', icon: ClipboardList },
+// { href: '/input/monitoring', label: 'Monitoring Internal', icon: ClipboardList },
   { href: '/cetak', label: 'Cetak', icon: Printer },
 ]
 
