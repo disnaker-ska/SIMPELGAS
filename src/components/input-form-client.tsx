@@ -16,6 +16,9 @@ import {
   MicOff,
   Eye,
   Trash2,
+  ImagePlus,
+  FileUp,
+  Plus,
 } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { submitLaporan } from '@/lib/actions'
@@ -723,10 +726,10 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     }
                   }
                 }}
-                className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100/90 flex flex-col justify-between"
+                className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100 flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label
                       htmlFor="in_file_dok"
                       className="text-[11px] font-bold text-slate-800 flex items-center gap-1 cursor-pointer"
@@ -753,6 +756,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                       </div>
                     )}
                   </div>
+
                   <input
                     ref={fileDokInputRef}
                     multiple
@@ -767,34 +771,59 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                         e.target.value = ''
                       }
                     }}
-                    className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover cursor-pointer border border-dashed border-sky-200 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
+                    className="hidden"
                   />
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Bisa multiple foto & drag-and-drop. Otomatis dikompresi.
-                  </p>
-                </div>
 
-                {/* Photo Previews Grid */}
-                {docFiles.length > 0 && (
-                  <div className="grid grid-cols-3 gap-1.5 mt-2 max-h-36 overflow-y-auto p-1 bg-white/70 rounded-lg border border-sky-100">
-                    {docFiles.map((file, idx) => (
-                      <PhotoThumbnail
-                        key={`${file.name}-${idx}`}
-                        file={file}
-                        onRemove={() => removeDocFile(idx)}
-                        onPreview={(url) =>
-                          setFilePreview({
-                            isOpen: true,
-                            fileUrl: url,
-                            fileName: file.name,
-                            fileType: 'image',
-                          })
-                        }
-                        formatSize={formatFileSize}
-                      />
-                    ))}
-                  </div>
-                )}
+                  {docFiles.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => fileDokInputRef.current?.click()}
+                      className="w-full flex flex-col items-center justify-center py-3.5 px-2 border-2 border-dashed border-sky-200 hover:border-primary hover:bg-sky-100/50 rounded-lg bg-white/80 transition cursor-pointer text-center group"
+                    >
+                      <div className="p-1.5 bg-sky-100 rounded-full text-primary group-hover:scale-110 transition mb-1">
+                        <ImagePlus size={16} />
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-700 group-hover:text-primary">
+                        Pilih / Tarik Foto ke Sini
+                      </p>
+                      <p className="text-[9px] text-slate-400 mt-0.5">
+                        Format JPG, PNG, WEBP (Bisa multiple)
+                      </p>
+                    </button>
+                  ) : (
+                    <div>
+                      {/* Photo Previews Grid */}
+                      <div className="grid grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-1 bg-white/70 rounded-lg border border-sky-100">
+                        {docFiles.map((file, idx) => (
+                          <PhotoThumbnail
+                            key={`${file.name}-${idx}`}
+                            file={file}
+                            onRemove={() => removeDocFile(idx)}
+                            onPreview={(url) =>
+                              setFilePreview({
+                                isOpen: true,
+                                fileUrl: url,
+                                fileName: file.name,
+                                fileType: 'image',
+                              })
+                            }
+                            formatSize={formatFileSize}
+                          />
+                        ))}
+                        {/* Mini Add Button */}
+                        <button
+                          type="button"
+                          onClick={() => fileDokInputRef.current?.click()}
+                          className="aspect-square rounded-md border-2 border-dashed border-sky-200 hover:border-primary bg-white/50 hover:bg-sky-50 flex flex-col items-center justify-center text-slate-500 hover:text-primary transition cursor-pointer"
+                          title="Tambah foto lagi"
+                        >
+                          <Plus size={16} />
+                          <span className="text-[8px] font-bold mt-0.5">Tambah</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Materi Upload Card */}
@@ -816,7 +845,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                 className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label
                       htmlFor="in_file_materi"
                       className="text-[11px] font-bold text-slate-800 flex items-center gap-1 cursor-pointer"
@@ -843,6 +872,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                       </div>
                     )}
                   </div>
+
                   <input
                     ref={fileMatInputRef}
                     multiple
@@ -857,34 +887,57 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                         e.target.value = ''
                       }
                     }}
-                    className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer border border-dashed border-slate-300 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
+                    className="hidden"
                   />
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Opsional. Maksimal 5MB per berkas.
-                  </p>
-                </div>
 
-                {/* Material Files Preview List */}
-                {matFiles.length > 0 && (
-                  <div className="space-y-1.5 mt-2 max-h-36 overflow-y-auto p-1 bg-white/70 rounded-lg border border-slate-200">
-                    {matFiles.map((file, idx) => (
-                      <MaterialItem
-                        key={`${file.name}-${idx}`}
-                        file={file}
-                        onRemove={() => removeMatFile(idx)}
-                        onPreview={(url) =>
-                          setFilePreview({
-                            isOpen: true,
-                            fileUrl: url,
-                            fileName: file.name,
-                            fileType: 'pdf',
-                          })
-                        }
-                        formatSize={formatFileSize}
-                      />
-                    ))}
-                  </div>
-                )}
+                  {matFiles.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => fileMatInputRef.current?.click()}
+                      className="w-full flex flex-col items-center justify-center py-3.5 px-2 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-100/60 rounded-lg bg-white/80 transition cursor-pointer text-center group"
+                    >
+                      <div className="p-1.5 bg-slate-100 rounded-full text-slate-600 group-hover:scale-110 transition mb-1">
+                        <FileUp size={16} />
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-700 group-hover:text-slate-900">
+                        Pilih / Tarik Berkas Materi
+                      </p>
+                      <p className="text-[9px] text-slate-400 mt-0.5">
+                        PDF, DOCX, XLSX (Maks. 5MB)
+                      </p>
+                    </button>
+                  ) : (
+                    <div>
+                      {/* Material Files Preview List */}
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto p-1 bg-white/70 rounded-lg border border-slate-200">
+                        {matFiles.map((file, idx) => (
+                          <MaterialItem
+                            key={`${file.name}-${idx}`}
+                            file={file}
+                            onRemove={() => removeMatFile(idx)}
+                            onPreview={(url) =>
+                              setFilePreview({
+                                isOpen: true,
+                                fileUrl: url,
+                                fileName: file.name,
+                                fileType: 'pdf',
+                              })
+                            }
+                            formatSize={formatFileSize}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileMatInputRef.current?.click()}
+                        className="w-full mt-1.5 py-1 px-2 border border-dashed border-slate-300 hover:border-slate-400 rounded-md bg-white text-slate-600 hover:text-slate-800 text-[10px] font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
+                      >
+                        <Plus size={12} />
+                        <span>Tambah Berkas Lain</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
