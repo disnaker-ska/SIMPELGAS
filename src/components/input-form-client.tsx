@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { FileSignature, Camera, FileText, Send, Loader2, Sparkles } from 'lucide-react'
 import Swal from 'sweetalert2'
-import { submitLaporan, uploadFiles } from '@/lib/actions'
+import { submitLaporan } from '@/lib/actions'
 import type { Pegawai } from '@/lib/types'
 
 interface InputFormClientProps {
@@ -149,21 +149,13 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         })
       )
 
-      // Upload files to Supabase Storage
-      const dokUrls = docsPayload.length > 0
-        ? await uploadFiles('dokumentasi', docsPayload)
-        : []
-      const materiUrls = materiPayload.length > 0
-        ? await uploadFiles('materi', materiPayload)
-        : []
-
       // Find selected pegawai
       const pegawaiId = formData.get('pegawai_id') as string
       const targetPegawai = pegawaiList.find((p) => p.id === pegawaiId)
 
       const result = await submitLaporan(
         {
-          pegawai_id: pegawaiId,
+          pegawai_id: targetPegawai?.nama || pegawaiId,
           bidang: formData.get('bidang') as string,
           jabatan: targetPegawai?.jabatan || '',
           jenis_penugasan: formData.get('jenis') as string,
@@ -174,8 +166,8 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
           tamu_undangan: formData.get('tamu') as string,
           catatan_hasil: formData.get('catatan') as string,
         },
-        dokUrls,
-        materiUrls
+        docsPayload,
+        materiPayload
       )
 
       if (result.status === 'success') {
