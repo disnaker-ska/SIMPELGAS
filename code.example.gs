@@ -1,4 +1,4 @@
-var PARENT_FOLDER_ID = "1Jo4uGnXCeJFZgdlZDFskLfdjD5PUNedfjx6oH3X3Suefd6IciwI4F22gHL4zkP7DuP3KQFRR";
+var PARENT_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID_HERE";
 
 function doGet(e) {
   var output = ContentService.createTextOutput();

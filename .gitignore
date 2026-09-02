@@ -47,3 +47,6 @@ scratch/
 .agents/
 .specify/
 .superpowers/
+
+# google apps script credentials
+code.gs
