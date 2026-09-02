@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   FileSignature,
   Camera,
@@ -36,17 +36,21 @@ function PhotoThumbnail({
   onPreview: (url: string) => void
   formatSize: (bytes: number) => string
 }) {
-  const [url, setUrl] = useState<string>('')
-
-  useEffect(() => {
-    const objectUrl = URL.createObjectURL(file)
-    setUrl(objectUrl)
-    return () => {
-      URL.revokeObjectURL(objectUrl)
+  const url = useMemo(() => {
+    try {
+      return URL.createObjectURL(file)
+    } catch {
+      return ''
     }
   }, [file])
 
-  if (!url) return null
+  useEffect(() => {
+    return () => {
+      if (url) {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }, [url])
 
   return (
     <div className="group relative aspect-square rounded-md overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
@@ -702,7 +706,25 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
             {/* Lampiran Dual Dropzone Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {/* Foto Upload Card */}
-              <div className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100/90 flex flex-col justify-between">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
+                      f.type.startsWith('image/')
+                    )
+                    if (dropped.length > 0) {
+                      setDocFiles((prev) => [...prev, ...dropped])
+                    }
+                  }
+                }}
+                className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100/90 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label
@@ -719,7 +741,10 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                         </span>
                         <button
                           type="button"
-                          onClick={() => setDocFiles([])}
+                          onClick={() => {
+                            setDocFiles([])
+                            if (fileDokInputRef.current) fileDokInputRef.current.value = ''
+                          }}
                           className="text-[10px] text-slate-400 hover:text-destructive transition cursor-pointer"
                           title="Hapus semua foto"
                         >
@@ -738,13 +763,14 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
                         const files = Array.from(e.target.files)
-                        setDocFiles(files)
+                        setDocFiles((prev) => [...prev, ...files])
+                        e.target.value = ''
                       }
                     }}
                     className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover cursor-pointer border border-dashed border-sky-200 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
                   />
                   <p className="text-[10px] text-slate-500 mt-0.5">
-                    Bisa multiple foto. Otomatis dikompresi.
+                    Bisa multiple foto & drag-and-drop. Otomatis dikompresi.
                   </p>
                 </div>
 
@@ -772,7 +798,23 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
               </div>
 
               {/* Materi Upload Card */}
-              <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const dropped = Array.from(e.dataTransfer.files)
+                    if (dropped.length > 0) {
+                      setMatFiles((prev) => [...prev, ...dropped])
+                    }
+                  }
+                }}
+                className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label
@@ -811,7 +853,8 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
                         const files = Array.from(e.target.files)
-                        setMatFiles(files)
+                        setMatFiles((prev) => [...prev, ...files])
+                        e.target.value = ''
                       }
                     }}
                     className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer border border-dashed border-slate-300 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
