@@ -20,7 +20,7 @@ function cleanMarkdown(text: string): string {
 }
 
 async function callGemini(text: string, apiKey: string, model?: string): Promise<string> {
-  const targetModel = model || process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+  const targetModel = model || process.env.GEMINI_MODEL || 'gemini-2.5-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`
   const res = await fetch(url, {
     method: 'POST',
@@ -45,7 +45,7 @@ async function callGemini(text: string, apiKey: string, model?: string): Promise
 }
 
 async function callOpenRouter(text: string, apiKey: string, model?: string): Promise<string> {
-  const targetModel = model || 'google/gemini-2.0-flash-exp:free'
+  const targetModel = model || process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free'
   const url = 'https://openrouter.ai/api/v1/chat/completions'
 
   const res = await fetch(url, {

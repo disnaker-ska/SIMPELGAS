@@ -70,7 +70,7 @@ describe('API /api/enhance (Multi-Provider Failover)', () => {
   it('4. Automatically falls back to OpenRouter when Google Gemini fails (e.g. 429 rate limit)', async () => {
     process.env.GEMINI_API_KEY = 'test-gemini-key'
     process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
-    process.env.OPENROUTER_MODEL = 'google/gemini-2.0-flash-exp:free'
+    process.env.OPENROUTER_MODEL = 'nvidia/nemotron-3.5-lightning:free'
 
     global.fetch = vi
       .fn()
