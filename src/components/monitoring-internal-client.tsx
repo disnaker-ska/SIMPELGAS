@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ClipboardList, Camera, FileText, Send, Loader2, Sparkles, Users, UtensilsCrossed } from 'lucide-react'
+import { ClipboardList, Camera, FileText, Send, Loader2, Sparkles, Users, UtensilsCrossed, Mic, MicOff } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { submitKegiatanInternal } from '@/lib/actions'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
+import { useSpeechToText } from '@/lib/use-speech-to-text'
 import type { Pegawai } from '@/lib/types'
 
 interface MonitoringInternalClientProps {
@@ -94,6 +95,28 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
     }))
   }
 
+  const { isListening, toggleListening } = useSpeechToText({
+    lang: 'id-ID',
+    onTranscript: (chunk, isFinal) => {
+      if (isFinal) {
+        setHasilText((prev) => {
+          const trimmed = prev.trim()
+          return trimmed ? `${trimmed}\n${chunk}` : chunk
+        })
+      }
+    },
+    onError: (err) => {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'error',
+        title: `Mikrofon: ${err}`,
+        showConfirmButton: false,
+        timer: 3000,
+      })
+    },
+  })
+
   const enhanceTextWithAI = async () => {
     if (!hasilText.trim()) return
     setIsEnhancing(true)
@@ -110,7 +133,10 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
         toast: true,
         position: 'top-end',
         icon: 'success',
-        title: 'Teks disempurnakan dengan AI',
+        title:
+          data.provider === 'openrouter'
+            ? 'Teks disempurnakan (OpenRouter AI)'
+            : 'Teks disempurnakan dengan AI',
         showConfirmButton: false,
         timer: 3000,
       })
@@ -296,18 +322,56 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
             </div>
           </div>
 
-          {/* Row 7: Hasil + AI */}
+          {/* Row 7: Hasil + Dikte Suara + AI */}
           <div className="space-y-2">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-2 gap-2">
               <label htmlFor="mi_hasil" className={labelClass}>Hasil Kegiatan / Notulen Ringkas</label>
-              <button type="button" onClick={enhanceTextWithAI} disabled={isEnhancing || !hasilText.trim() || isSubmitting}
-                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-violet-600 hover:to-indigo-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center cursor-pointer">
-                {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Perbaiki Teks dengan AI
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  disabled={isEnhancing || isSubmitting}
+                  className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                    isListening
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                  }`}
+                  title={isListening ? 'Hentikan dikte suara' : 'Mulai dikte suara (Speech-to-Text)'}
+                >
+                  {isListening ? (
+                    <>
+                      <MicOff size={14} className="text-white" />
+                      <span>Mendengarkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={14} className="text-primary" />
+                      <span>Dikte Suara</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={enhanceTextWithAI}
+                  disabled={isEnhancing || !hasilText.trim() || isSubmitting || isListening}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-violet-600 hover:to-indigo-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center cursor-pointer"
+                >
+                  {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Perbaiki Teks dengan AI
+                </button>
+              </div>
             </div>
-            <textarea name="hasil_kegiatan" id="mi_hasil" rows={4} value={hasilText} onChange={(e) => setHasilText(e.target.value)}
-              placeholder="Tuliskan poin-poin penting hasil kegiatan..."
-              className={`${inputClass} resize-y ${isEnhancing ? 'opacity-50' : ''}`} disabled={isEnhancing || isSubmitting} />
+            <textarea
+              name="hasil_kegiatan"
+              id="mi_hasil"
+              rows={4}
+              value={hasilText}
+              onChange={(e) => setHasilText(e.target.value)}
+              placeholder="Tuliskan poin-poin penting hasil kegiatan (bisa gunakan Dikte Suara)..."
+              className={`${inputClass} resize-y ${isEnhancing ? 'opacity-50' : ''} ${
+                isListening ? 'border-rose-300 ring-2 ring-rose-200' : ''
+              }`}
+              disabled={isEnhancing || isSubmitting}
+            />
           </div>
 
           {/* SPJ Uploads */}

@@ -1,42 +1,43 @@
 /**
  * SIMPELGAS Design Tokens (Single Source of Truth)
- * Sesuai spesifikasi docs/DOKUMEN_REFERENSI_TEKNIS/UIUX_DESIGN.md - Civic Spectrum
+ * Sesuai spesifikasi palet Warm Sunset / Terracotta Rose
  */
 
 export const DESIGN_TOKENS = {
   colors: {
-    // Brand
+    // Brand Warm Sunset Spectrum
     primary: {
-      default: '#38BDF8', // Sky 400
-      hover: '#0EA5E9',   // Sky 500
-      text: '#082F49',    // Text on primary
-      dark: '#0369A1',    // Sky 700 (text on light)
-      soft: '#F0F9FF',    // Sky 50
+      default: '#FB9B8F', // Warm Coral / Sunset Salmon
+      hover: '#F08577',   // Deep Coral
+      text: '#431407',    // Deep Espresso (WCAG AAA contrast on coral)
+      dark: '#C2410C',    // Terracotta 700 (text on light)
+      soft: '#FFF3F0',    // Coral Soft Tint
     },
     secondary: {
-      default: '#EC69B5', // Pink 400
-      hover: '#DB4FA3',   // Pink 500
-      text: '#500724',    // Text on secondary
+      default: '#F57799', // Rose Blossom / Raspberry Pink
+      hover: '#E65A80',   // Deep Rose
+      text: '#500724',    // Deep Berry (WCAG AAA contrast on rose)
       dark: '#BE185D',    // Pink 700
-      soft: '#FDF2F8',    // Pink 50
+      soft: '#FDF2F5',    // Rose Soft Tint
     },
     accent: {
-      default: '#9B7FEA', // Violet 400
-      hover: '#7C3AED',   // Violet 600
-      text: '#1E1B4B',    // Text on accent
-      soft: '#F5F3FF',    // Violet 50
+      default: '#FDC3A1', // Soft Apricot / Warm Peach
+      hover: '#FBA87B',   // Deep Peach
+      text: '#451A03',    // Dark Mocha (WCAG AAA contrast on peach)
+      soft: '#FFF7CD',    // Custard Cream / Vanilla Soft Glow
     },
-    // Dark anchor & neutrals
-    darkAnchor: '#0F172A', // Slate 900 / Navy 900
+    // Dark anchor & warm neutrals (Zero dark navy blue)
+    darkAnchor: '#1C1917', // Warm Espresso Charcoal
     slate: {
-      900: '#0F172A',
-      700: '#334155',
-      600: '#475569',
-      500: '#64748B',
-      400: '#94A3B8',
-      200: '#E2E8F0',
-      100: '#F1F5F9',
-      50: '#F8FAFC',
+      900: '#1C1917', // Warm Charcoal (Sidebar / Dark headers)
+      800: '#292524', // Warm Charcoal Border
+      700: '#44403C', // Warm Charcoal Text
+      600: '#57534E',
+      500: '#78716C',
+      400: '#A8A29E',
+      200: '#E7E5E4',
+      100: '#F5F5F4',
+      50: '#FAFAF9',
     },
     // Semantics
     success: {
@@ -56,13 +57,13 @@ export const DESIGN_TOKENS = {
     },
   },
   charts: {
-    bidang: ['#38BDF8', '#EC69B5', '#9B7FEA', '#059669', '#64748B'],
+    bidang: ['#FB9B8F', '#F57799', '#FDC3A1', '#059669', '#78716C'],
   },
   sweetAlert: {
-    confirmButtonColor: '#38BDF8',
-    confirmButtonTextColor: '#082F49',
-    secondaryConfirmButtonColor: '#EC69B5',
+    confirmButtonColor: '#FB9B8F',
+    confirmButtonTextColor: '#431407',
+    secondaryConfirmButtonColor: '#F57799',
     destructiveConfirmButtonColor: '#DC2626',
-    cancelButtonColor: '#64748B',
+    cancelButtonColor: '#78716C',
   },
 } as const

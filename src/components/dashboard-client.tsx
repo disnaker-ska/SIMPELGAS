@@ -3,22 +3,25 @@
  */
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import {
   LayoutDashboard as DashboardIcon,
   RefreshCw,
   Calendar,
   MapPin,
-  ChevronLeft,
-  ChevronRight,
   Filter,
   Users,
   FileText,
   CheckCircle2,
+  AlertCircle,
   RotateCcw,
   PieChart as PieChartIcon,
   BarChart3,
   FileSpreadsheet,
+  ArrowRight,
+  Printer,
+  Sparkles,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -57,7 +60,7 @@ function isPerluTindakLanjut(str: string): boolean {
 
 export function DashboardClient({
   initialLaporan,
-  initialStats,
+  initialStats: _initialStats,
   pegawaiList,
 }: DashboardClientProps) {
   const router = useRouter()
@@ -67,8 +70,6 @@ export function DashboardClient({
   const [filterBulan, setFilterBulan] = useState('Semua')
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
   const currentYear = new Date().getFullYear()
 
   // Get unique bidang list (normalized)
@@ -158,7 +159,6 @@ export function DashboardClient({
       countBidang[normalizedBidang] = (countBidang[normalizedBidang] || 0) + 1
 
       const rawJenis = (item.jenis_penugasan || '').trim()
-      // Filter label sampah seperti "-", "- . . -", dsb.
       const isValidJenis = rawJenis.length > 0 && !/^[-\s.]+$/.test(rawJenis)
       if (isValidJenis) {
         countJenis[rawJenis] = (countJenis[rawJenis] || 0) + 1
@@ -179,16 +179,10 @@ export function DashboardClient({
     }
   }, [filteredData])
 
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return filteredData.slice(start, start + itemsPerPage)
-  }, [filteredData, currentPage])
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [filterBidang, filterStatus, filterBulan, filterStartDate, filterEndDate])
+  // Top 5 recent activities
+  const recentActivities = useMemo(() => {
+    return filteredData.slice(0, 5)
+  }, [filteredData])
 
   const handleRefresh = () => {
     setIsRefreshing(true)
@@ -211,160 +205,191 @@ export function DashboardClient({
     setFilterEndDate('')
   }
 
-  const bulanList = [
-    { value: '1', label: 'Januari' }, { value: '2', label: 'Februari' },
-    { value: '3', label: 'Maret' }, { value: '4', label: 'April' },
-    { value: '5', label: 'Mei' }, { value: '6', label: 'Juni' },
-    { value: '7', label: 'Juli' }, { value: '8', label: 'Agustus' },
-    { value: '9', label: 'September' }, { value: '10', label: 'Oktober' },
-    { value: '11', label: 'November' }, { value: '12', label: 'Desember' },
-  ]
+  const exportToExcel = async () => {
+    const XLSX = await import('xlsx')
+    const exportData = filteredData.map((item, index) => {
+      const isPerlu = isPerluTindakLanjut(item.status_tindak_lanjut)
+      return {
+        No: index + 1,
+        'Tanggal Kegiatan': item.tanggal_kegiatan
+          ? new Date(item.tanggal_kegiatan).toLocaleDateString('id-ID')
+          : '-',
+        'Nama Pegawai': item.pegawai?.nama || '-',
+        NIP: item.pegawai?.nip || '-',
+        Jabatan: item.jabatan || item.pegawai?.jabatan || '-',
+        Bidang: item.bidang || item.pegawai?.bidang || '-',
+        'Jenis Penugasan': item.jenis_penugasan || '-',
+        'Nama Kegiatan': item.nama_kegiatan || '-',
+        'Tempat Kegiatan': item.tempat_kegiatan || '-',
+        Penyelenggara: item.penyelenggara || '-',
+        'Tamu Undangan': item.tamu_undangan || '-',
+        'Catatan Hasil': item.catatan_hasil || '-',
+        'Status Tindak Lanjut': isPerlu ? 'Perlu Tindak Lanjut' : 'Untuk Diketahui',
+        'Catatan Pimpinan': item.catatan_pimpinan || '-',
+      }
+    })
 
-  const evalPercent = stats.totalLaporan > 0
-    ? Math.round((stats.totalDievaluasi / stats.totalLaporan) * 100)
-    : 0
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Penugasan')
+    const now = new Date()
+    const filename = `SIMPELGAS_Rekap_Penugasan_${now.getFullYear()}${String(
+      now.getMonth() + 1
+    ).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}.xlsx`
+    XLSX.writeFile(workbook, filename)
+  }
 
-  const avgPerPerson = stats.uniquePegawai > 0
-    ? (stats.totalLaporan / stats.uniquePegawai).toFixed(1)
-    : '0'
+  const evalPercent =
+    stats.totalLaporan > 0
+      ? Math.round((stats.totalDievaluasi / stats.totalLaporan) * 100)
+      : 0
+  const avgPerPerson =
+    stats.uniquePegawai > 0
+      ? (stats.totalLaporan / stats.uniquePegawai).toFixed(1)
+      : '0'
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/80 pb-5">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <DashboardIcon size={20} />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Statistik Laporan Penugasan ASN
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">
-                Pemerintah Kota Surakarta · Dinas Tenaga Kerja
-              </p>
-            </div>
+    <div className="space-y-5">
+      {/* 1. Header Toolbar */}
+      <div className="bg-slate-900 rounded-2xl p-5 sm:p-6 text-white border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 bg-slate-800 rounded-xl text-primary border border-slate-700/80">
+            <DashboardIcon size={24} />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              Dashboard Monitoring Penugasan
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
+              Ringkasan analitik eksekutif dan pemantauan beban kerja penugasan ASN Dinas Tenaga Kerja Surakarta.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          {hasActiveFilter && (
-            <button
-              onClick={resetFilter}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-xs"
-            >
-              <RotateCcw size={14} />
-              Reset Filter
-            </button>
-          )}
+        <div className="flex items-center gap-2.5 self-start md:self-auto">
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer active:scale-95 shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl transition cursor-pointer active:scale-95 disabled:opacity-50"
+            title="Muat ulang data terbaru"
           >
-            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-primary' : 'text-slate-500'} />
-            Segarkan Data
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-primary' : ''} />
+            <span>Sinkronisasi</span>
+          </button>
+
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
+            title="Ekspor rekap data ke format Microsoft Excel"
+          >
+            <FileSpreadsheet size={14} />
+            <span>Unduh Excel</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Executive Filter Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-3.5">
-          <div className="flex items-center gap-2 text-slate-700">
-            <Filter size={16} className="text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Filter Parameter
-            </span>
+      {/* 2. Filter Toolbar */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+            <Filter size={14} className="text-primary" />
+            <span>Filter Data Penugasan</span>
           </div>
           {hasActiveFilter && (
-            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60">
-              Filter Aktif
-            </span>
+            <button
+              onClick={resetFilter}
+              className="text-xs text-primary hover:text-primary-hover font-semibold flex items-center gap-1 cursor-pointer transition"
+            >
+              <RotateCcw size={12} />
+              <span>Reset Filter</span>
+            </button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Bidang
-            </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Bidang */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Bidang / Unit Kerja</label>
             <select
               value={filterBidang}
               onChange={(e) => setFilterBidang(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
+              className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none cursor-pointer"
             >
               <option value="Semua">Semua Bidang</option>
               {bidangOptions.map((b) => (
-                <option key={b} value={b}>{b}</option>
+                <option key={b} value={b}>
+                  {b}
+                </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Status Tindak Lanjut
-            </label>
+          {/* Status */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Status Tindak Lanjut</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
+              className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none cursor-pointer"
             >
               <option value="Semua">Semua Status</option>
-              <option value="Untuk Diketahui">Untuk Diketahui</option>
-              <option value="Perlu Tindak Lanjut Bidang Teknis">Perlu Tindak Lanjut</option>
+              <option value="Selesai (Untuk Diketahui)">Selesai (Untuk Diketahui)</option>
+              <option value="Perlu Tindak Lanjut">Perlu Tindak Lanjut</option>
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Bulan ({currentYear})
-            </label>
+          {/* Bulan */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Bulan ({currentYear})</label>
             <select
               value={filterBulan}
               onChange={(e) => setFilterBulan(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
+              className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none cursor-pointer"
             >
               <option value="Semua">Semua Bulan</option>
-              {bulanList.map((b) => (
-                <option key={b.value} value={b.value}>{b.label}</option>
-              ))}
+              <option value="1">Januari</option>
+              <option value="2">Februari</option>
+              <option value="3">Maret</option>
+              <option value="4">April</option>
+              <option value="5">Mei</option>
+              <option value="6">Juni</option>
+              <option value="7">Juli</option>
+              <option value="8">Agustus</option>
+              <option value="9">September</option>
+              <option value="10">Oktober</option>
+              <option value="11">November</option>
+              <option value="12">Desember</option>
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Tanggal Mulai
-            </label>
-            <input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Tanggal Selesai
-            </label>
-            <input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
-            />
+          {/* Rentang Tanggal */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-600">Rentang Tanggal</label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none"
+              />
+              <span className="text-slate-400 text-xs">-</span>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Executive KPI Cards (Clean Elevated, No Side-Stripes) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Card 1: Total Penugasan */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between">
+      {/* 3. Metric KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Card 1: Total Laporan */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total Penugasan
               </span>
@@ -373,46 +398,49 @@ export function DashboardClient({
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-black text-slate-900 tabular-nums tracking-tight">
+              <span className="text-3xl font-black text-slate-900 tabular-nums">
                 {stats.totalLaporan.toLocaleString('id-ID')}
               </span>
               <span className="text-xs font-semibold text-slate-500">laporan kegiatan</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Tercatat pada sistem</span>
-            <span className="text-primary font-semibold">100% tervalidasi</span>
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Status</span>
+            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Tersinkronisasi
+            </span>
           </div>
         </div>
 
-        {/* Card 2: Pegawai Terlibat */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between">
+        {/* Card 2: Pegawai Aktif */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Pegawai Terlibat
+                Pegawai Bertugas
               </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+              <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center text-secondary">
                 <Users size={16} />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-black text-slate-900 tabular-nums tracking-tight">
+              <span className="text-3xl font-black text-slate-900 tabular-nums">
                 {stats.uniquePegawai.toLocaleString('id-ID')}
               </span>
               <span className="text-xs font-semibold text-slate-500">personel aktif</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>Rata-rata penugasan</span>
-            <span className="text-amber-700 font-semibold">{avgPerPerson} per pegawai</span>
+            <span className="text-slate-800 font-semibold">{avgPerPerson} per pegawai</span>
           </div>
         </div>
 
         {/* Card 3: Telah Dievaluasi */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Evaluasi Pimpinan
               </span>
@@ -421,13 +449,13 @@ export function DashboardClient({
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-black text-slate-900 tabular-nums tracking-tight">
+              <span className="text-3xl font-black text-slate-900 tabular-nums">
                 {stats.totalDievaluasi.toLocaleString('id-ID')}
               </span>
               <span className="text-xs font-semibold text-slate-500">telah di-ACC</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5">
+          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5">
             <div className="flex justify-between items-center text-xs">
               <span className="text-slate-500 font-medium">Tingkat Evaluasi</span>
               <span className="font-bold text-emerald-700 tabular-nums">{evalPercent}%</span>
@@ -443,13 +471,13 @@ export function DashboardClient({
       </div>
 
       {/* 4. Analytics Grid (Donut & Ranked Bar Chart) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Donut Chart: Distribusi per Bidang */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
             <div className="flex items-center gap-2">
               <PieChartIcon size={16} className="text-primary" />
-              <h3 className="font-bold text-slate-900 text-sm">
+              <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
                 Distribusi Laporan per Bidang
               </h3>
             </div>
@@ -459,20 +487,19 @@ export function DashboardClient({
           </div>
 
           {chartsData.bidang.length > 0 ? (
-            <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
-              {/* Dynamic Donut Chart Visual with Center Metric */}
+            <div className="flex flex-col sm:flex-row items-center gap-5 py-2">
               <DynamicBidangDonutChart
                 data={chartsData.bidang}
                 totalLaporan={stats.totalLaporan}
                 colors={BIDANG_COLORS}
               />
 
-              {/* Informative Legend List */}
-              <div className="flex-1 w-full space-y-2.5">
+              <div className="flex-1 w-full space-y-2">
                 {chartsData.bidang.map((item, idx) => {
-                  const pct = stats.totalLaporan > 0
-                    ? Math.round((item.value / stats.totalLaporan) * 100)
-                    : 0
+                  const pct =
+                    stats.totalLaporan > 0
+                      ? Math.round((item.value / stats.totalLaporan) * 100)
+                      : 0
                   return (
                     <div
                       key={item.name}
@@ -481,7 +508,9 @@ export function DashboardClient({
                       <div className="flex items-center gap-2 min-w-0 pr-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: BIDANG_COLORS[idx % BIDANG_COLORS.length] }}
+                          style={{
+                            backgroundColor: BIDANG_COLORS[idx % BIDANG_COLORS.length],
+                          }}
                         />
                         <span className="font-semibold text-slate-700 truncate" title={item.name}>
                           {item.name}
@@ -499,18 +528,18 @@ export function DashboardClient({
               </div>
             </div>
           ) : (
-            <div className="h-48 flex items-center justify-center text-slate-400 text-xs font-medium">
+            <div className="h-44 flex items-center justify-center text-slate-400 text-xs font-medium">
               Tidak ada data penugasan untuk filter saat ini
             </div>
           )}
         </div>
 
         {/* Ranked Horizontal Bars: Jenis Kegiatan */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
             <div className="flex items-center gap-2">
               <BarChart3 size={16} className="text-primary" />
-              <h3 className="font-bold text-slate-900 text-sm">
+              <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
                 Berdasarkan Jenis Kegiatan
               </h3>
             </div>
@@ -520,11 +549,14 @@ export function DashboardClient({
           </div>
 
           {chartsData.jenis.length > 0 ? (
-            <div className="space-y-3.5 my-auto">
+            <div className="space-y-3 my-auto">
               {chartsData.jenis.slice(0, 5).map((item, idx) => {
                 const maxVal = Math.max(...chartsData.jenis.map((j) => j.value), 1)
                 const pct = Math.round((item.value / maxVal) * 100)
-                const totalPct = stats.totalLaporan > 0 ? Math.round((item.value / stats.totalLaporan) * 100) : 0
+                const totalPct =
+                  stats.totalLaporan > 0
+                    ? Math.round((item.value / stats.totalLaporan) * 100)
+                    : 0
 
                 return (
                   <div key={item.name} className="space-y-1">
@@ -542,9 +574,9 @@ export function DashboardClient({
                         <span className="text-[10px] font-medium text-slate-500">({totalPct}%)</span>
                       </div>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                       <div
-                        className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-hover transition-all duration-700"
+                        className="h-1.5 rounded-full bg-primary transition-all duration-700"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -553,182 +585,128 @@ export function DashboardClient({
               })}
             </div>
           ) : (
-            <div className="h-48 flex items-center justify-center text-slate-400 text-xs font-medium">
+            <div className="h-44 flex items-center justify-center text-slate-400 text-xs font-medium">
               Tidak ada data kategori kegiatan
             </div>
           )}
         </div>
       </div>
 
-      {/* 5. Data Table Penugasan (Single Container, Clean Slate Theme) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        {/* Table Header Strip */}
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/40">
+      {/* 5. Recent Activity Feed & Shortcut to Cetak Hub */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-              <FileSpreadsheet size={15} />
+            <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+              <Sparkles size={16} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">
-                Rincian Data Penugasan
+              <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
+                Aktivitas Penugasan Terkini
               </h3>
               <p className="text-[11px] text-slate-500">
-                Riwayat pelaporan resmi pegawai Disnaker Surakarta
+                5 pelaporan penugasan dinas terbaru yang tercatat
               </p>
             </div>
           </div>
-          <div className="text-xs text-slate-500 font-medium">
-            Menampilkan <span className="font-bold text-slate-900 tabular-nums">{paginatedData.length}</span> dari{' '}
-            <span className="font-bold text-slate-900 tabular-nums">{filteredData.length}</span> data
+
+          <Link
+            href="/cetak"
+            className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition"
+          >
+            <span>Buka Semua di Menu Cetak</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        {recentActivities.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              title="Belum Ada Penugasan"
+              description="Belum ada aktivitas laporan kegiatan yang tercatat untuk filter ini."
+            />
           </div>
-        </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {recentActivities.map((item, idx) => {
+              const isPerlu = isPerluTindakLanjut(item.status_tindak_lanjut)
+              const targetPeg =
+                pegawaiList.find((p) => p.id === item.pegawai_id) || item.pegawai
+              const namaPegawai = targetPeg?.nama || item.pegawai_id || '-'
+              const tanggalStr = item.tanggal_kegiatan
+                ? new Date(item.tanggal_kegiatan).toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })
+                : '-'
 
-        {/* Scrollable Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-900 text-slate-100 text-[11px] font-bold uppercase tracking-wider">
-                <th className="py-3 px-4 text-center w-12">No</th>
-                <th className="py-3 px-4 whitespace-nowrap">Tanggal</th>
-                <th className="py-3 px-4 whitespace-nowrap">Nama Pegawai</th>
-                <th className="py-3 px-4 whitespace-nowrap">Bidang</th>
-                <th className="py-3 px-4 min-w-[240px]">Nama Kegiatan</th>
-                <th className="py-3 px-4 whitespace-nowrap">Tempat</th>
-                <th className="py-3 px-4 text-center whitespace-nowrap">Status</th>
-              </tr>
-            </thead>
-            <tbody className="text-xs divide-y divide-slate-100">
-              {paginatedData.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 px-4 bg-slate-50/30">
-                    <EmptyState
-                      title="Tidak Ada Data Laporan"
-                      description="Tidak ditemukan data yang sesuai dengan kriteria filter atau pencarian saat ini."
-                      action={
-                        hasActiveFilter ? (
-                          <button
-                            onClick={resetFilter}
-                            type="button"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover active:scale-95 transition-all cursor-pointer shadow-sm"
-                          >
-                            <RotateCcw size={13} />
-                            Reset Filter
-                          </button>
-                        ) : undefined
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((item, idx) => {
-                  const isPerlu = isPerluTindakLanjut(item.status_tindak_lanjut)
-                  const globalIdx = (currentPage - 1) * itemsPerPage + idx + 1
-                  const tanggal = item.tanggal_kegiatan
-                    ? new Date(item.tanggal_kegiatan).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '-'
-
-                  return (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="py-3 px-4 text-center font-bold text-slate-600 tabular-nums">
-                        {globalIdx}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-600 font-medium tabular-nums">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar size={13} className="text-slate-400" />
-                          {tanggal}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap font-bold text-slate-900">
-                        {item.pegawai?.nama || '-'}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-600 font-medium">
+              return (
+                <div
+                  key={item.id || idx}
+                  className="p-3.5 sm:p-4 hover:bg-slate-50/70 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-slate-900">{namaPegawai}</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">
                         {item.bidang || '-'}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-slate-800 leading-snug">
-                        {item.nama_kegiatan || '-'}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <MapPin size={13} className="text-slate-400" />
-                          {item.tempat_kegiatan || '-'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {!isPerlu ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            Untuk Diketahui
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 shadow-xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                            Perlu Tindak Lanjut
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </span>
+                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                        <Calendar size={12} />
+                        {tanggalStr}
+                      </span>
+                    </div>
 
-        {/* Pagination Toolbar */}
-        {filteredData.length > itemsPerPage && (
-          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-50/40 text-xs">
-            <p className="text-slate-500 font-medium">
-              Menampilkan <span className="font-bold text-slate-900 tabular-nums">{(currentPage - 1) * itemsPerPage + 1}</span> -{' '}
-              <span className="font-bold text-slate-900 tabular-nums">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span>{' '}
-              dari <span className="font-bold text-slate-900 tabular-nums">{filteredData.length}</span> data
-            </p>
+                    <div className="font-medium text-slate-800 line-clamp-1">
+                      {item.nama_kegiatan || '-'}
+                    </div>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="p-1.5 border border-slate-200 rounded-lg hover:bg-white text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-95 shadow-xs"
-                title="Halaman Sebelumnya"
-              >
-                <ChevronLeft size={16} />
-              </button>
+                    {item.tempat_kegiatan && (
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <MapPin size={11} className="text-slate-400 shrink-0" />
+                        <span className="truncate">{item.tempat_kegiatan}</span>
+                      </div>
+                    )}
+                  </div>
 
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer active:scale-95 ${
-                      currentPage === i + 1
-                        ? 'bg-primary text-primary-foreground shadow-xs'
-                        : 'text-slate-600 hover:bg-white hover:border border-slate-200'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
+                  <div className="flex items-center gap-2.5 self-start sm:self-center shrink-0">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                        isPerlu
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}
+                    >
+                      {isPerlu ? <AlertCircle size={11} /> : <CheckCircle2 size={11} />}
+                      <span>{isPerlu ? 'Perlu Tindak Lanjut' : 'Untuk Diketahui'}</span>
+                    </span>
 
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="p-1.5 border border-slate-200 rounded-lg hover:bg-white text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-95 shadow-xs"
-                title="Halaman Berikutnya"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+                    <Link
+                      href="/cetak"
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition flex items-center gap-1"
+                    >
+                      <Printer size={12} className="text-primary" />
+                      <span>Cetak</span>
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
+
+        {/* Bottom Shortcut Banner */}
+        <div className="p-3.5 bg-slate-50 border-t border-slate-100 text-center">
+          <Link
+            href="/cetak"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-primary hover:text-primary-hover px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-xs hover:shadow-sm transition active:scale-98 cursor-pointer"
+          >
+            <Printer size={15} />
+            <span>Kelola &amp; Cetak Seluruh Laporan ({filteredData.length} Data)</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
     </div>
   )
 }
-

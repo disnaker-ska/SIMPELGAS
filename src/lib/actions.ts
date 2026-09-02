@@ -252,7 +252,9 @@ export async function loginPimpinan(roleName: string, pin: string) {
     }
   }
 
-  const role = PIMPINAN_ROLES_CONFIG.find((r) => r.name === roleName)
+  const role = PIMPINAN_ROLES_CONFIG.find(
+    (r) => r.name.trim().toLowerCase() === roleName.trim().toLowerCase()
+  )
 
   if (!role || !role.pin) {
     console.error(`[AUTH] PIN untuk role "${roleName}" tidak ditemukan di environment variables.`)
@@ -324,6 +326,7 @@ export async function getDirectImageBase64(url: string): Promise<string | null> 
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       },
+      signal: AbortSignal.timeout(4000),
       next: { revalidate: 86400 },
     })
     if (!res.ok) return null

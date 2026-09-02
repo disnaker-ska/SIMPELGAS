@@ -1,10 +1,22 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { FileSignature, Camera, FileText, Send, Loader2, Sparkles } from 'lucide-react'
+import {
+  FileSignature,
+  Camera,
+  FileText,
+  Send,
+  Loader2,
+  Sparkles,
+  Building2,
+  CheckCircle2,
+  Mic,
+  MicOff,
+} from 'lucide-react'
 import Swal from 'sweetalert2'
 import { submitLaporan } from '@/lib/actions'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
+import { useSpeechToText } from '@/lib/use-speech-to-text'
 import type { Pegawai } from '@/lib/types'
 
 interface InputFormClientProps {
@@ -16,6 +28,8 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   const [selectedBidang, setSelectedBidang] = useState('')
   const [catatanText, setCatatanText] = useState('')
   const [isEnhancing, setIsEnhancing] = useState(false)
+  const [docFileCount, setDocFileCount] = useState(0)
+  const [matFileCount, setMatFileCount] = useState(0)
   const formRef = useRef<HTMLFormElement>(null)
 
   const bidangOptions = [...new Set(pegawaiList.map((p) => p.bidang).filter(Boolean))]
@@ -43,8 +57,14 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   // Helper: Compress image
   const compressImage = (file: File, maxSizeMB = 1): Promise<File> => {
     return new Promise((resolve, reject) => {
-      if (!file || !file.type.startsWith('image/')) { resolve(file); return }
-      if (file.size / 1024 / 1024 < maxSizeMB) { resolve(file); return }
+      if (!file || !file.type.startsWith('image/')) {
+        resolve(file)
+        return
+      }
+      if (file.size / 1024 / 1024 < maxSizeMB) {
+        resolve(file)
+        return
+      }
 
       const reader = new FileReader()
       reader.readAsDataURL(file)
@@ -59,9 +79,15 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
           let height = img.height
 
           if (width > height) {
-            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH }
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width
+              width = MAX_WIDTH
+            }
           } else {
-            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT }
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height
+              height = MAX_HEIGHT
+            }
           }
 
           canvas.width = width
@@ -71,7 +97,10 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
 
           canvas.toBlob(
             (blob) => {
-              const newFile = new File([blob!], file.name, { type: 'image/jpeg', lastModified: Date.now() })
+              const newFile = new File([blob!], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              })
               resolve(newFile)
             },
             'image/jpeg',
@@ -83,6 +112,28 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
       reader.onerror = (error) => reject(error)
     })
   }
+
+  const { isListening, toggleListening } = useSpeechToText({
+    lang: 'id-ID',
+    onTranscript: (chunk, isFinal) => {
+      if (isFinal) {
+        setCatatanText((prev) => {
+          const trimmed = prev.trim()
+          return trimmed ? `${trimmed}\n${chunk}` : chunk
+        })
+      }
+    },
+    onError: (err) => {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'error',
+        title: `Mikrofon: ${err}`,
+        showConfirmButton: false,
+        timer: 3000,
+      })
+    },
+  })
 
   const enhanceTextWithAI = async () => {
     if (!catatanText.trim()) return
@@ -102,7 +153,10 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         toast: true,
         position: 'top-end',
         icon: 'success',
-        title: 'Teks disempurnakan dengan AI',
+        title:
+          data.provider === 'openrouter'
+            ? 'Teks disempurnakan (OpenRouter AI)'
+            : 'Teks disempurnakan dengan AI',
         showConfirmButton: false,
         timer: 3000,
       })
@@ -124,12 +178,18 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
 
     const formData = new FormData(e.currentTarget)
     const rawData = Object.fromEntries(formData.entries())
-    const docFiles = (formData.getAll('file_dok') as File[]).filter((f) => f && f.size > 0)
-    const matFiles = (formData.getAll('file_materi') as File[]).filter((f) => f && f.size > 0)
+    const docFiles = (formData.getAll('file_dok') as File[]).filter(
+      (f) => f && f.size > 0
+    )
+    const matFiles = (formData.getAll('file_materi') as File[]).filter(
+      (f) => f && f.size > 0
+    )
 
     try {
       // Compress image files
-      const compressedDocFiles = await Promise.all(docFiles.map((file) => compressImage(file)))
+      const compressedDocFiles = await Promise.all(
+        docFiles.map((file) => compressImage(file))
+      )
 
       const base64Docs = await Promise.all(
         compressedDocFiles.map(async (file) => ({
@@ -166,13 +226,15 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
       if (res.status === 'success') {
         Swal.fire({
           title: 'Berhasil!',
-          text: 'Laporan tersimpan.',
+          text: 'Laporan penugasan berhasil disimpan.',
           icon: 'success',
           confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
         })
         formRef.current?.reset()
         setSelectedBidang('')
         setCatatanText('')
+        setDocFileCount(0)
+        setMatFileCount(0)
       } else {
         throw new Error(res.message || 'Gagal menyimpan data ke Spreadsheet.')
       }
@@ -189,166 +251,359 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative w-full max-w-5xl mx-auto">
+      {/* Loading Overlay */}
       {isSubmitting && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center text-center max-w-sm w-11/12 border border-slate-200">
-            <Loader2 className="animate-spin text-primary mb-4" size={48} />
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Memproses</h3>
-            <p className="text-slate-500 text-sm">Mohon tunggu, sedang mengirim laporan...</p>
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm rounded-2xl">
+          <div className="bg-white p-5 rounded-2xl shadow-xl flex flex-col items-center text-center max-w-sm w-11/12 border border-slate-200">
+            <Loader2 className="animate-spin text-primary mb-2.5" size={36} />
+            <h3 className="text-base font-bold text-slate-900 mb-1">Menyimpan Laporan</h3>
+            <p className="text-slate-500 text-xs">Mohon tunggu, berkas dan data sedang diunggah...</p>
           </div>
         </div>
       )}
 
-      <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden max-w-4xl mx-auto transition-all duration-300 ${isSubmitting ? 'blur-sm pointer-events-none' : ''}`}>
-        <div className="bg-slate-900 px-6 py-4 border-b border-slate-800">
-          <h2 className="text-xl font-bold text-white flex items-center">
-            <FileSignature className="mr-3 text-primary" size={24} /> Formulir Laporan Penugasan
-          </h2>
+      {/* Main Cockpit Card */}
+      <div
+        className={`bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden w-full transition-all duration-300 ${
+          isSubmitting ? 'blur-sm pointer-events-none' : ''
+        }`}
+      >
+        {/* Compact Header Bar */}
+        <div className="bg-slate-900 px-4 sm:px-5 py-2.5 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-slate-800 rounded-md text-primary">
+              <FileSignature size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-white leading-tight">
+                Formulir Laporan Penugasan
+              </h2>
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                Pencatatan resmi kegiatan penugasan ASN Dinas Tenaga Kerja Surakarta
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-800/80 rounded-full border border-slate-700 text-slate-300 text-[11px] font-medium">
+            <Building2 size={12} className="text-primary" />
+            <span>SIMPELGAS</span>
+          </div>
         </div>
 
-        <form ref={formRef} onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label htmlFor="in_bidang" className="block text-sm font-semibold text-slate-700">
-                Bidang / Unit Kerja <span className="text-destructive">*</span>
-              </label>
-              <select
-                name="bidang"
-                id="in_bidang"
+        {/* 2-Column Responsive Workbench Form (Activates on md: 768px+) */}
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-stretch"
+        >
+          {/* LEFT COLUMN: Metadata & Identitas Penugasan (6 cols on md, 5 on xl) */}
+          <div className="md:col-span-6 xl:col-span-5 flex flex-col gap-2.5 justify-between">
+            {/* Sub-panel 1: Pegawai & Penugasan */}
+            <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 flex flex-col gap-2">
+              <div className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-200">
+                <span className="w-1.5 h-3 bg-primary rounded-full" />
+                Data Pegawai & Penugasan
+              </div>
+
+              {/* Row: Bidang & Nama */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <label htmlFor="in_bidang" className="block text-[11px] font-semibold text-slate-700">
+                    Bidang / Unit Kerja <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    name="bidang"
+                    id="in_bidang"
+                    required
+                    value={selectedBidang}
+                    onChange={(e) => setSelectedBidang(e.target.value)}
+                    className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                  >
+                    <option value="">-- Pilih Bidang --</option>
+                    {bidangOptions.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-0.5">
+                  <label htmlFor="in_nama" className="block text-[11px] font-semibold text-slate-700">
+                    Nama Pegawai <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    name="pegawai_id"
+                    id="in_nama"
+                    required
+                    disabled={!selectedBidang}
+                    className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8 disabled:bg-slate-200 disabled:cursor-not-allowed"
+                  >
+                    <option value="">-- Pilih Nama Pegawai --</option>
+                    {filteredPegawai.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row: Jenis Penugasan & Tanggal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <label htmlFor="in_jenis" className="block text-[11px] font-semibold text-slate-700">
+                    Jenis Penugasan <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    name="jenis"
+                    id="in_jenis"
+                    required
+                    className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                  >
+                    <option value="">-- Pilih Jenis --</option>
+                    <option value="Rapat Koordinasi">Rapat Koordinasi</option>
+                    <option value="Sosialisasi / Bimtek">Sosialisasi / Bimtek</option>
+                    <option value="Monitoring & Evaluasi">Monitoring & Evaluasi</option>
+                    <option value="Kunjungan Kerja">Kunjungan Kerja</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+
+                <div className="space-y-0.5">
+                  <label htmlFor="in_tanggal" className="block text-[11px] font-semibold text-slate-700">
+                    Tanggal Kegiatan <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="tanggal"
+                    id="in_tanggal"
+                    required
+                    className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-panel 2: Detail Kegiatan & Lokasi */}
+            <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 flex flex-col gap-2">
+              <div className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-200">
+                <span className="w-1.5 h-3 bg-primary rounded-full" />
+                Informasi & Lokasi Acara
+              </div>
+
+              {/* Nama Kegiatan */}
+              <div className="space-y-0.5">
+                <label htmlFor="in_kegiatan" className="block text-[11px] font-semibold text-slate-700">
+                  Nama Kegiatan <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="kegiatan"
+                  id="in_kegiatan"
+                  placeholder="Contoh: Rapat Evaluasi Kinerja Triwulan III"
+                  required
+                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                />
+              </div>
+
+              {/* Row: Tempat & Penyelenggara */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <label htmlFor="in_tempat" className="block text-[11px] font-semibold text-slate-700">
+                    Tempat Kegiatan <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="tempat"
+                    id="in_tempat"
+                    placeholder="Contoh: Hotel Solo Paragon"
+                    required
+                    className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                  />
+                </div>
+
+                <div className="space-y-0.5">
+                  <label htmlFor="in_penyelenggara" className="block text-[11px] font-semibold text-slate-700">
+                    Penyelenggara <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="penyelenggara"
+                    id="in_penyelenggara"
+                    placeholder="Contoh: Disnaker Prov. Jateng"
+                    required
+                    className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                  />
+                </div>
+              </div>
+
+              {/* Tamu Undangan */}
+              <div className="space-y-0.5">
+                <label htmlFor="in_tamu" className="block text-[11px] font-semibold text-slate-700">
+                  Tamu Undangan / Peserta
+                </label>
+                <input
+                  type="text"
+                  name="tamu"
+                  id="in_tamu"
+                  placeholder="Contoh: Perwakilan OPD, Camat se-Surakarta"
+                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none h-8"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Catatan AI, Lampiran & Aksi Kirim (6 cols on md, 7 on xl) */}
+          <div className="md:col-span-6 xl:col-span-7 flex flex-col gap-2.5 justify-between">
+            {/* Catatan + Dikte Suara & AI Enhance Section */}
+            <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 flex flex-col gap-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-slate-200">
+                <div className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-1.5 h-3 bg-primary rounded-full" />
+                  Catatan Hasil Kegiatan <span className="text-destructive">*</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {/* Tombol Dikte Suara (STT) */}
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    disabled={isEnhancing || isSubmitting}
+                    className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer active:scale-95 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isListening
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                    title={isListening ? 'Hentikan dikte suara' : 'Mulai dikte suara (Speech-to-Text)'}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicOff size={12} className="text-white" />
+                        <span>Mendengarkan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={12} className="text-primary" />
+                        <span>Dikte Suara</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Tombol Perbaiki Teks dengan AI */}
+                  <button
+                    type="button"
+                    onClick={enhanceTextWithAI}
+                    disabled={isEnhancing || !catatanText.trim() || isSubmitting || isListening}
+                    className="flex items-center justify-center gap-1 px-2.5 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer active:scale-95 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Perbaiki dan kembangkan poin kegiatan dengan AI"
+                  >
+                    {isEnhancing ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    <span>Perbaiki Teks dengan AI</span>
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                name="catatan"
+                id="in_catatan"
+                rows={3}
+                value={catatanText}
+                onChange={(e) => setCatatanText(e.target.value)}
+                placeholder="Tuliskan ringkasan pokok pembahasan, keputusan, dan tindak lanjut hasil kegiatan di sini (bisa gunakan Dikte Suara)..."
                 required
-                value={selectedBidang}
-                onChange={(e) => setSelectedBidang(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none"
-              >
-                <option value="">-- Pilih Bidang --</option>
-                {bidangOptions.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
+                className={`w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-white transition outline-none resize-none h-20 sm:h-24 ${
+                  isEnhancing ? 'opacity-50' : ''
+                } ${isListening ? 'border-rose-300 ring-2 ring-rose-200' : ''}`}
+                disabled={isEnhancing || isSubmitting}
+              />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="in_nama" className="block text-sm font-semibold text-slate-700">
-                Nama Pegawai <span className="text-destructive">*</span>
-              </label>
-              <select
-                name="pegawai_id"
-                id="in_nama"
-                required
-                disabled={!selectedBidang}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none disabled:bg-slate-200 disabled:cursor-not-allowed"
-              >
-                <option value="">-- Pilih Nama Pegawai --</option>
-                {filteredPegawai.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nama}</option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label htmlFor="in_jenis" className="block text-sm font-semibold text-slate-700">
-                Jenis Penugasan <span className="text-destructive">*</span>
-              </label>
-              <select name="jenis" id="in_jenis" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none">
-                <option value="">-- Pilih Jenis --</option>
-                <option value="Rapat Koordinasi">Rapat Koordinasi</option>
-                <option value="Sosialisasi / Bimtek">Sosialisasi / Bimtek</option>
-                <option value="Monitoring & Evaluasi">Monitoring & Evaluasi</option>
-                <option value="Kunjungan Kerja">Kunjungan Kerja</option>
-                <option value="Lainnya">Lainnya</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="in_tanggal" className="block text-sm font-semibold text-slate-700">
-                Tanggal Kegiatan <span className="text-destructive">*</span>
-              </label>
-              <input type="date" name="tanggal" id="in_tanggal" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
-            </div>
-          </div>
+            {/* Lampiran Dual Dropzone Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Foto Upload Card */}
+              <div className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100/90 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1">
+                  <label
+                    htmlFor="in_file_dok"
+                    className="text-[11px] font-bold text-slate-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera size={13} className="text-primary" />
+                    <span>Dokumentasi (Foto)</span>
+                  </label>
+                  {docFileCount > 0 && (
+                    <span className="text-[10px] bg-primary/20 text-sky-900 font-bold px-1.5 py-0.2 rounded flex items-center gap-1">
+                      <CheckCircle2 size={10} /> {docFileCount} foto
+                    </span>
+                  )}
+                </div>
+                <input
+                  multiple
+                  type="file"
+                  name="file_dok"
+                  id="in_file_dok"
+                  accept="image/*"
+                  onChange={(e) => setDocFileCount(e.target.files?.length || 0)}
+                  className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover cursor-pointer border border-dashed border-sky-200 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Bisa multiple foto. Otomatis dikompresi.
+                </p>
+              </div>
 
-          <div className="space-y-2">
-            <label htmlFor="in_kegiatan" className="block text-sm font-semibold text-slate-700">
-              Nama Kegiatan <span className="text-destructive">*</span>
-            </label>
-            <input type="text" name="kegiatan" id="in_kegiatan" placeholder="Contoh: Rapat Evaluasi Kinerja Triwulan III" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label htmlFor="in_tempat" className="block text-sm font-semibold text-slate-700">
-                Tempat Kegiatan <span className="text-destructive">*</span>
-              </label>
-              <input type="text" name="tempat" id="in_tempat" placeholder="Contoh: Hotel Solo Paragon" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
+              {/* Materi Upload Card */}
+              <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1">
+                  <label
+                    htmlFor="in_file_materi"
+                    className="text-[11px] font-bold text-slate-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <FileText size={13} className="text-slate-600" />
+                    <span>Materi (PDF/Docx)</span>
+                  </label>
+                  {matFileCount > 0 && (
+                    <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-1.5 py-0.2 rounded flex items-center gap-1">
+                      <CheckCircle2 size={10} /> {matFileCount} file
+                    </span>
+                  )}
+                </div>
+                <input
+                  multiple
+                  type="file"
+                  name="file_materi"
+                  id="in_file_materi"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                  onChange={(e) => setMatFileCount(e.target.files?.length || 0)}
+                  className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer border border-dashed border-slate-300 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Opsional. Maksimal 5MB per berkas.
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="in_penyelenggara" className="block text-sm font-semibold text-slate-700">
-                Penyelenggara Kegiatan <span className="text-destructive">*</span>
-              </label>
-              <input type="text" name="penyelenggara" id="in_penyelenggara" placeholder="Contoh: Disnaker Prov. Jateng" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <label htmlFor="in_tamu" className="block text-sm font-semibold text-slate-700">Tamu Undangan / Peserta yang Hadir</label>
-            <input type="text" name="tamu" id="in_tamu" placeholder="Contoh: Perwakilan OPD, Camat se-Surakarta" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-primary text-primary-foreground py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm hover:bg-primary-hover disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-[0.99] shadow-md hover:shadow-lg flex justify-center items-center gap-2 outline-none focus:ring-4 focus:ring-primary/30"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  <span>Sedang Memproses...</span>
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  <span>Kirim Laporan Penugasan</span>
+                </>
+              )}
+            </button>
           </div>
-
-          {/* Catatan + AI */}
-          <div className="space-y-2">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-2 gap-2">
-              <label htmlFor="in_catatan" className="block text-sm font-semibold text-slate-700">
-                Catatan Hasil Kegiatan <span className="text-destructive">*</span>
-              </label>
-              <button
-                type="button"
-                onClick={enhanceTextWithAI}
-                disabled={isEnhancing || !catatanText.trim() || isSubmitting}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-violet-600 hover:to-indigo-700 transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-                title="Perbaiki dan kembangkan poin kegiatan dengan AI"
-              >
-                {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Perbaiki Teks dengan AI
-              </button>
-            </div>
-            <textarea
-              name="catatan"
-              id="in_catatan"
-              rows={4}
-              value={catatanText}
-              onChange={(e) => setCatatanText(e.target.value)}
-              placeholder="Tuliskan poin-poin penting hasil kegiatan di sini..."
-              required
-              className={`w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none resize-y ${isEnhancing ? 'opacity-50' : ''}`}
-              disabled={isEnhancing || isSubmitting}
-            />
-          </div>
-
-          {/* File Uploads */}
-          <div className="bg-sky-50/50 p-6 rounded-xl border border-sky-100 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label htmlFor="in_file_dok" className="block text-sm font-bold text-slate-800 flex items-center gap-1">
-                <Camera size={16} className="text-primary" /> Dokumentasi (Foto)
-              </label>
-              <input multiple type="file" name="file_dok" id="in_file_dok" accept="image/*" className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover cursor-pointer border border-dashed border-slate-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-primary" />
-              <p className="text-xs text-slate-500 mt-1">Bisa pilih lebih dari 1 foto. Otomatis dikompres.</p>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="in_file_materi" className="block text-sm font-bold text-slate-800 flex items-center gap-1">
-                <FileText size={16} className="text-primary" /> Materi (PDF/Docx) <span className="text-xs font-normal text-slate-500">- Opsional</span>
-              </label>
-              <input multiple type="file" name="file_materi" id="in_file_materi" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer border border-dashed border-slate-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-primary" />
-              <p className="text-xs text-slate-500 mt-1">Bisa pilih lebih dari 1 file. Maks 5MB/file.</p>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-primary text-primary-foreground py-4 rounded-xl font-bold text-lg hover:bg-primary-hover disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-lg flex justify-center items-center gap-2 outline-none focus:ring-4 focus:ring-primary/30"
-          >
-            {isSubmitting ? <><Loader2 className="animate-spin" /> Sedang Memproses...</> : <><Send size={20} /> Kirim Laporan Penugasan</>}
-          </button>
         </form>
       </div>
     </div>

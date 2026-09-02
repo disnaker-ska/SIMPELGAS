@@ -10,6 +10,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Warm Neutral Slate/Stone mapping (eliminates cold dark navy blue)
+        slate: {
+          50: '#FAFAF9',
+          100: '#F5F5F4',
+          200: '#E7E5E4',
+          300: '#D6D3D1',
+          400: '#A8A29E',
+          500: '#78716C',
+          600: '#57534E',
+          700: '#44403C',
+          800: '#292524',
+          900: '#1C1917', // Deep Warm Espresso Charcoal
+          950: '#0C0A09',
+        },
         // Civic Spectrum & Semantic Tokens via CSS Variables
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
