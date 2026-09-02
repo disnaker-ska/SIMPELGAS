@@ -17,6 +17,7 @@ import Swal from 'sweetalert2'
 import { submitLaporan } from '@/lib/actions'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
 import { useSpeechToText } from '@/lib/use-speech-to-text'
+import { AiCompareModal } from '@/components/ui/ai-compare-modal'
 import type { Pegawai } from '@/lib/types'
 
 interface InputFormClientProps {
@@ -30,6 +31,17 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   const [isEnhancing, setIsEnhancing] = useState(false)
   const [docFileCount, setDocFileCount] = useState(0)
   const [matFileCount, setMatFileCount] = useState(0)
+  const [compareModal, setCompareModal] = useState<{
+    isOpen: boolean
+    originalText: string
+    enhancedText: string
+    provider: 'gemini' | 'openrouter'
+  }>({
+    isOpen: false,
+    originalText: '',
+    enhancedText: '',
+    provider: 'gemini',
+  })
   const formRef = useRef<HTMLFormElement>(null)
 
   const bidangOptions = [...new Set(pegawaiList.map((p) => p.bidang).filter(Boolean))]
@@ -147,18 +159,12 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setCatatanText(data.enhanced)
 
-      Swal.fire({
-        toast: true,
-        position: 'top-end',
-        icon: 'success',
-        title:
-          data.provider === 'openrouter'
-            ? 'Teks disempurnakan (OpenRouter AI)'
-            : 'Teks disempurnakan dengan AI',
-        showConfirmButton: false,
-        timer: 3000,
+      setCompareModal({
+        isOpen: true,
+        originalText: catatanText,
+        enhancedText: data.enhanced,
+        provider: data.provider || 'gemini',
       })
     } catch (error: any) {
       Swal.fire({
@@ -606,6 +612,26 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
           </div>
         </form>
       </div>
+
+      {/* Modal Side-by-Side Comparison AI */}
+      <AiCompareModal
+        isOpen={compareModal.isOpen}
+        originalText={compareModal.originalText}
+        enhancedText={compareModal.enhancedText}
+        provider={compareModal.provider}
+        onClose={() => setCompareModal((prev) => ({ ...prev, isOpen: false }))}
+        onApply={(appliedText) => {
+          setCatatanText(appliedText)
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Teks rekomendasi AI diterapkan ke form',
+            showConfirmButton: false,
+            timer: 2500,
+          })
+        }}
+      />
     </div>
   )
 }

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 
-const PROMPT_TEMPLATE = (text: string) => `Anda adalah asisten AI profesional untuk penyusunan laporan kegiatan instansi pemerintah Kota Surakarta. Tugas Anda adalah memperbaiki dan mengembangkan catatan laporan kegiatan berikut agar lebih formal, profesional, dan rapi. 
+const PROMPT_TEMPLATE = (text: string) => `Anda adalah asisten AI profesional untuk perbaikan tata bahasa laporan kegiatan kedinasan Pemerintah Kota Surakarta. Tugas Anda HANYA membetulkan ejaan, tata bahasa baku (PUEBI/EYD), dan merapikan struktur kalimat agar formal dan bernada kedinasan.
 
-Aturan:
-1. Perbaiki typo, ejaan, dan tata bahasa (gunakan bahasa Indonesia yang sangat formal/kedinasan).
-2. PERTAHANKAN struktur poin-poin (bullet points) jika input asli menggunakan poin-poin. Jangan digabung menjadi satu paragraf jika inputnya terstruktur.
-3. Jangan mengubah esensi, angka, tanggal, nama orang, atau instansi sedikitpun.
-4. Jangan gunakan tanda kutip markdown atau format tebal/miring, berikan teks bersih.
-5. Buat kalimatnya lebih mengalir tapi tetap singkat dan padat.
+ATURAN KETAT (WAJIB DIPATUHI):
+1. DILARANG KERAS MENAMBAH FAKTA BARU: Jangan menambah informasi, hasil keputusan rekaan, agenda baru, instansi baru, atau asumsi apapun yang tidak tertulis pada teks asli pengguna.
+2. DILARANG MENGUBAH DATA: Jangan mengubah esensi isi, angka, nominal, tanggal, waktu, nama orang/pejabat, nama tempat, dan nama instansi.
+3. PERTAHANKAN FORMAT: Jika teks asli berbentuk poin-poin (bullet points/penomoran), tetap sajikan dalam format poin-poin yang rapi. Jangan digabung menjadi satu paragraf padat.
+4. KOREKSI TATA BAHASA & TYPO: Perbaiki salah ketik (typo), singkatan informal menjadi formal (contoh: 'sdh' -> 'sudah', 'yg' -> 'yang', 'rakor' -> 'rapat koordinasi'), dan tata kalimat agar bernada resmi kedinasan.
+5. OUTPUT BERSIH: Berikan HANYA teks hasil perbaikan langsung tanpa tanda kutip markdown (\`\`\`), tanpa kata pengantar, dan tanpa kalimat penutup.
 
 Teks asli dari pengguna:
 ${text}`
