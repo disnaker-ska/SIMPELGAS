@@ -989,9 +989,10 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-2 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 flex items-center gap-1.5 text-xs text-primary font-medium transition"
+                        className="py-2.5 px-3 bg-white hover:bg-sky-50 rounded-xl border-2 border-slate-300 hover:border-sky-500 flex items-center justify-center gap-2 text-xs font-bold text-slate-800 hover:text-sky-900 transition shadow-2xs group"
+                        title={`Buka Foto ${i + 1}`}
                       >
-                        <ExternalLink size={12} />
+                        <ExternalLink size={13} className="text-sky-600 group-hover:scale-110 transition shrink-0" />
                         <span>Foto {i + 1}</span>
                       </a>
                     ))}
@@ -1003,20 +1004,21 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
               {selectedDetail.materi_urls && selectedDetail.materi_urls.length > 0 && (
                 <div className="space-y-1.5">
                   <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1">
-                    <FileText size={13} className="text-slate-600" />
+                    <FileText size={13} className="text-emerald-600" />
                     Berkas Materi / Paparan ({selectedDetail.materi_urls.length})
                   </span>
-                  <div className="space-y-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {selectedDetail.materi_urls.map((url, i) => (
                       <a
                         key={i}
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-2 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 flex items-center gap-1.5 text-xs text-primary font-medium transition"
+                        className="py-2.5 px-3 bg-white hover:bg-emerald-50 rounded-xl border-2 border-slate-300 hover:border-emerald-500 flex items-center justify-center gap-2 text-xs font-bold text-slate-800 hover:text-emerald-900 transition shadow-2xs group"
+                        title={`Buka Berkas Materi ${i + 1}`}
                       >
-                        <ExternalLink size={12} />
-                        <span className="truncate">Dokumen Materi {i + 1} ({url})</span>
+                        <ExternalLink size={13} className="text-emerald-600 group-hover:scale-110 transition shrink-0" />
+                        <span>Materi {i + 1}</span>
                       </a>
                     ))}
                   </div>
@@ -1028,7 +1030,7 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
             <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
               <button
                 onClick={() => setSelectedDetail(null)}
-                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs sm:text-sm transition cursor-pointer"
+                className="px-4 py-2 bg-white border-2 border-slate-300 hover:bg-slate-100 text-slate-800 font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer"
               >
                 Tutup
               </button>

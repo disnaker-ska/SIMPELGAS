@@ -298,7 +298,7 @@ export function DashboardClient({
           {hasActiveFilter && (
             <button
               onClick={resetFilter}
-              className="text-xs text-primary hover:text-primary-hover font-semibold flex items-center gap-1 cursor-pointer transition"
+              className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer transition"
             >
               <RotateCcw size={12} />
               <span>Reset Filter</span>
@@ -611,7 +611,7 @@ export function DashboardClient({
 
           <Link
             href="/cetak"
-            className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition"
+            className="text-xs font-bold text-sky-700 hover:text-sky-800 flex items-center gap-1 transition"
           >
             <span>Buka Semua di Menu Cetak</span>
             <ArrowRight size={14} />
@@ -699,7 +699,7 @@ export function DashboardClient({
         <div className="p-3.5 bg-slate-50 border-t border-slate-100 text-center">
           <Link
             href="/cetak"
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-primary hover:text-primary-hover px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-xs hover:shadow-sm transition active:scale-98 cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 hover:text-sky-800 px-4 py-2.5 rounded-xl bg-white border-2 border-slate-300 hover:border-sky-500 shadow-xs hover:shadow-sm transition active:scale-98 cursor-pointer"
           >
             <Printer size={15} />
             <span>Kelola &amp; Cetak Seluruh Laporan ({filteredData.length} Data)</span>
