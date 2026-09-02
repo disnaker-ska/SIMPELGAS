@@ -43,3 +43,6 @@ _backup_old/
 
 # scratch
 scratch/
+
+.agents/
+.specify/
