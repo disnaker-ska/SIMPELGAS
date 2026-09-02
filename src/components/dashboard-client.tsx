@@ -20,15 +20,24 @@ import {
   BarChart3,
   FileSpreadsheet,
 } from 'lucide-react'
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import type { Laporan, DashboardStats, Pegawai } from '@/lib/types'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { DESIGN_TOKENS } from '@/lib/design-tokens'
+
+const DynamicBidangDonutChart = dynamic(
+  () => import('./analytics-charts').then((mod) => mod.BidangDonutChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-48 h-48 shrink-0 flex items-center justify-center">
+        <Skeleton className="w-40 h-40 rounded-full" />
+      </div>
+    ),
+  }
+)
 
 interface DashboardClientProps {
   initialLaporan: Laporan[]
@@ -36,7 +45,15 @@ interface DashboardClientProps {
   pegawaiList: Pegawai[]
 }
 
-const BIDANG_COLORS = ['#1B3C73', '#D97706', '#0284C7', '#059669', '#64748B']
+const BIDANG_COLORS = [...DESIGN_TOKENS.charts.bidang]
+
+function cleanText(str: string): string {
+  return str ? str.toString().toLowerCase().replace(/\s+/g, ' ').trim() : ''
+}
+
+function isPerluTindakLanjut(str: string): boolean {
+  return cleanText(str).includes('perlu tindak lanjut')
+}
 
 export function DashboardClient({
   initialLaporan,
@@ -53,11 +70,6 @@ export function DashboardClient({
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const currentYear = new Date().getFullYear()
-
-  const cleanText = (str: string) =>
-    str ? str.toString().toLowerCase().replace(/\s+/g, ' ').trim() : ''
-  const isPerluTindakLanjut = (str: string) =>
-    cleanText(str).includes('perlu tindak lanjut')
 
   // Get unique bidang list (normalized)
   const bidangOptions = useMemo(() => {
@@ -222,7 +234,7 @@ export function DashboardClient({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/80 pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-navy-main/10 flex items-center justify-center text-navy-main">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
               <DashboardIcon size={20} />
             </div>
             <div>
@@ -240,7 +252,7 @@ export function DashboardClient({
           {hasActiveFilter && (
             <button
               onClick={resetFilter}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-xs"
             >
               <RotateCcw size={14} />
               Reset Filter
@@ -249,9 +261,9 @@ export function DashboardClient({
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer active:scale-95 shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-navy-main' : 'text-slate-500'} />
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-primary' : 'text-slate-500'} />
             Segarkan Data
           </button>
         </div>
@@ -261,7 +273,7 @@ export function DashboardClient({
       <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs">
         <div className="flex items-center justify-between mb-3.5">
           <div className="flex items-center gap-2 text-slate-700">
-            <Filter size={16} className="text-navy-main" />
+            <Filter size={16} className="text-primary" />
             <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
               Filter Parameter
             </span>
@@ -281,7 +293,7 @@ export function DashboardClient({
             <select
               value={filterBidang}
               onChange={(e) => setFilterBidang(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-navy-main focus:ring-1 focus:ring-navy-main outline-none transition"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
             >
               <option value="Semua">Semua Bidang</option>
               {bidangOptions.map((b) => (
@@ -297,7 +309,7 @@ export function DashboardClient({
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-navy-main focus:ring-1 focus:ring-navy-main outline-none transition"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
             >
               <option value="Semua">Semua Status</option>
               <option value="Untuk Diketahui">Untuk Diketahui</option>
@@ -312,7 +324,7 @@ export function DashboardClient({
             <select
               value={filterBulan}
               onChange={(e) => setFilterBulan(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-navy-main focus:ring-1 focus:ring-navy-main outline-none transition"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
             >
               <option value="Semua">Semua Bulan</option>
               {bulanList.map((b) => (
@@ -329,7 +341,7 @@ export function DashboardClient({
               type="date"
               value={filterStartDate}
               onChange={(e) => setFilterStartDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-navy-main focus:ring-1 focus:ring-navy-main outline-none transition"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
             />
           </div>
 
@@ -341,7 +353,7 @@ export function DashboardClient({
               type="date"
               value={filterEndDate}
               onChange={(e) => setFilterEndDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-navy-main focus:ring-1 focus:ring-navy-main outline-none transition"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
             />
           </div>
         </div>
@@ -356,7 +368,7 @@ export function DashboardClient({
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total Penugasan
               </span>
-              <div className="w-8 h-8 rounded-xl bg-navy-main/10 flex items-center justify-center text-navy-main">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <FileText size={16} />
               </div>
             </div>
@@ -369,7 +381,7 @@ export function DashboardClient({
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>Tercatat pada sistem</span>
-            <span className="text-navy-main font-semibold">100% tervalidasi</span>
+            <span className="text-primary font-semibold">100% tervalidasi</span>
           </div>
         </div>
 
@@ -436,7 +448,7 @@ export function DashboardClient({
         <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
             <div className="flex items-center gap-2">
-              <PieChartIcon size={16} className="text-navy-main" />
+              <PieChartIcon size={16} className="text-primary" />
               <h3 className="font-bold text-slate-900 text-sm">
                 Distribusi Laporan per Bidang
               </h3>
@@ -448,56 +460,12 @@ export function DashboardClient({
 
           {chartsData.bidang.length > 0 ? (
             <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
-              {/* Donut Chart Visual with Center Metric */}
-              <div className="relative w-48 h-48 shrink-0 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartsData.bidang}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={75}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {chartsData.bidang.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={BIDANG_COLORS[index % BIDANG_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0]
-                          const total = stats.totalLaporan || 1
-                          const pct = Math.round(((data.value as number) / total) * 100)
-                          return (
-                            <div className="bg-slate-900 text-white text-xs py-1 px-2.5 rounded-lg shadow-md">
-                              <p className="font-bold">{data.name}</p>
-                              <p className="text-slate-300">
-                                <span className="text-amber-400 font-bold">{data.value}</span> ({pct}%)
-                              </p>
-                            </div>
-                          )
-                        }
-                        return null
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Center Label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-slate-900 tabular-nums">
-                    {stats.totalLaporan}
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Laporan
-                  </span>
-                </div>
-              </div>
+              {/* Dynamic Donut Chart Visual with Center Metric */}
+              <DynamicBidangDonutChart
+                data={chartsData.bidang}
+                totalLaporan={stats.totalLaporan}
+                colors={BIDANG_COLORS}
+              />
 
               {/* Informative Legend List */}
               <div className="flex-1 w-full space-y-2.5">
@@ -541,7 +509,7 @@ export function DashboardClient({
         <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
             <div className="flex items-center gap-2">
-              <BarChart3 size={16} className="text-navy-main" />
+              <BarChart3 size={16} className="text-primary" />
               <h3 className="font-bold text-slate-900 text-sm">
                 Berdasarkan Jenis Kegiatan
               </h3>
@@ -576,7 +544,7 @@ export function DashboardClient({
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
-                        className="h-2 rounded-full bg-gradient-to-r from-navy-main to-navy-light transition-all duration-700"
+                        className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-hover transition-all duration-700"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -597,7 +565,7 @@ export function DashboardClient({
         {/* Table Header Strip */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/40">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-navy-main/10 flex items-center justify-center text-navy-main">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
               <FileSpreadsheet size={15} />
             </div>
             <div>
@@ -632,8 +600,23 @@ export function DashboardClient({
             <tbody className="text-xs divide-y divide-slate-100">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400 font-medium bg-slate-50/30">
-                    Tidak ada data yang sesuai dengan kriteria filter saat ini.
+                  <td colSpan={7} className="py-8 px-4 bg-slate-50/30">
+                    <EmptyState
+                      title="Tidak Ada Data Laporan"
+                      description="Tidak ditemukan data yang sesuai dengan kriteria filter atau pencarian saat ini."
+                      action={
+                        hasActiveFilter ? (
+                          <button
+                            onClick={resetFilter}
+                            type="button"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover active:scale-95 transition-all cursor-pointer shadow-sm"
+                          >
+                            <RotateCcw size={13} />
+                            Reset Filter
+                          </button>
+                        ) : undefined
+                      }
+                    />
                   </td>
                 </tr>
               ) : (
@@ -711,7 +694,7 @@ export function DashboardClient({
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="p-1.5 border border-slate-200 rounded-lg hover:bg-white text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs"
+                className="p-1.5 border border-slate-200 rounded-lg hover:bg-white text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-95 shadow-xs"
                 title="Halaman Sebelumnya"
               >
                 <ChevronLeft size={16} />
@@ -722,9 +705,9 @@ export function DashboardClient({
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`w-7 h-7 rounded-lg text-xs font-bold transition ${
+                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer active:scale-95 ${
                       currentPage === i + 1
-                        ? 'bg-navy-main text-white shadow-xs'
+                        ? 'bg-primary text-primary-foreground shadow-xs'
                         : 'text-slate-600 hover:bg-white hover:border border-slate-200'
                     }`}
                   >
@@ -736,7 +719,7 @@ export function DashboardClient({
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="p-1.5 border border-slate-200 rounded-lg hover:bg-white text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs"
+                className="p-1.5 border border-slate-200 rounded-lg hover:bg-white text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-95 shadow-xs"
                 title="Halaman Berikutnya"
               >
                 <ChevronRight size={16} />

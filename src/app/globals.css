@@ -4,26 +4,51 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Base Surfaces */
+    --background: 210 40% 98%;          /* #F8FAFC Slate 50 */
+    --foreground: 222 47% 11%;          /* #0F172A Slate 900 */
+    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 218 62% 28%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 218 62% 28%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Brand Civic Spectrum */
+    --primary: 199 89% 60%;             /* #38BDF8 Sky 400 */
+    --primary-hover: 199 89% 48%;       /* #0EA5E9 Sky 500 */
+    --primary-foreground: 201 96% 20%;  /* #082F49 Deep Blue text */
+
+    --secondary: 328 76% 67%;           /* #EC69B5 Pink 400 */
+    --secondary-hover: 326 66% 58%;     /* #DB4FA3 Pink 500 */
+    --secondary-foreground: 333 71% 21%;/* #500724 Deep Pink text */
+
+    --accent: 255 72% 71%;              /* #9B7FEA Violet 400 */
+    --accent-hover: 262 83% 58%;        /* #7C3AED Violet 600 */
+    --accent-foreground: 244 47% 20%;   /* #1E1B4B Deep Violet text */
+
+    /* Text Hierarchy */
+    --text-primary: 222 47% 11%;        /* #0F172A */
+    --text-secondary: 215 25% 27%;      /* #334155 */
+    --text-tertiary: 215 16% 47%;       /* #64748B */
+    --text-disabled: 215 20% 65%;       /* #94A3B8 */
+    --text-inverse: 0 0% 100%;          /* #FFFFFF */
+    --text-link: 199 94% 35%;           /* #0369A1 */
+    --text-accent-pink: 333 74% 42%;    /* #BE185D */
+
+    /* Neutral surfaces & borders */
+    --muted: 210 40% 96%;               /* #F1F5F9 Slate 100 */
+    --muted-foreground: 215 16% 47%;    /* #64748B */
+    --border: 214 32% 91%;              /* #E2E8F0 Slate 200 */
+    --input: 214 32% 91%;
+    --ring: 199 89% 60%;                /* Sky 400 focus ring */
     --radius: 0.75rem;
+
+    /* Semantic Status */
+    --success: 160 84% 39%;             /* #059669 Emerald 600 */
+    --success-soft: 152 76% 96%;        /* #ECFDF5 Emerald 50 */
+    --warning: 32 95% 44%;              /* #D97706 Amber 600 */
+    --warning-soft: 48 100% 96%;        /* #FFFBEB Amber 50 */
+    --destructive: 0 72% 51%;           /* #DC2626 Red 600 */
+    --destructive-soft: 0 86% 97%;      /* #FEF2F2 Red 50 */
   }
 }
 
@@ -39,8 +64,8 @@
 /* Custom Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #1B3C73; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 /* Print Styles */
 @media print {

@@ -19,6 +19,11 @@ import {
   type AppsScriptFilePayload,
 } from './appscript'
 import { getDriveDirectImageUrl } from './print-utils'
+import {
+  LaporanFormDataSchema,
+  EvaluasiPimpinanSchema,
+  LoginPimpinanSchema,
+} from './validations'
 
 // ============================================================
 // DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET)
@@ -120,6 +125,15 @@ export async function submitLaporan(
   dokFiles: AppsScriptFilePayload[] | any[] = [],
   materiFiles: AppsScriptFilePayload[] | any[] = []
 ) {
+  // Validasi form data dengan Zod
+  const validation = LaporanFormDataSchema.safeParse(formData)
+  if (!validation.success) {
+    return {
+      status: 'error',
+      message: validation.error.issues[0]?.message || 'Data formulir tidak valid.',
+    }
+  }
+
   // Pastikan payload file berformat AppsScriptFilePayload
   const dokumentasi: AppsScriptFilePayload[] = dokFiles
     .filter((f) => f && typeof f === 'object' && f.base64)
@@ -171,8 +185,16 @@ export async function updateEvaluasiPimpinan(
   roleName: string
 ) {
   const row = parseInt(laporanId, 10)
-  if (isNaN(row)) {
-    return { status: 'error', message: 'Row ID Laporan tidak valid.' }
+  const validation = EvaluasiPimpinanSchema.safeParse({
+    rowIndex: row,
+    status_tindak_lanjut: status,
+    catatan_pimpinan: catatanBaru,
+  })
+  if (!validation.success) {
+    return {
+      status: 'error',
+      message: validation.error.issues[0]?.message || 'Input evaluasi tidak valid.',
+    }
   }
 
   // Ambil laporan saat ini untuk menyambung catatan pimpinan yang sudah ada
@@ -221,6 +243,15 @@ const PIMPINAN_ROLES_CONFIG = [
 ]
 
 export async function loginPimpinan(roleName: string, pin: string) {
+  // Validasi format PIN menggunakan Zod
+  const pinValidation = LoginPimpinanSchema.safeParse({ pin })
+  if (!pinValidation.success) {
+    return {
+      success: false,
+      message: pinValidation.error.issues[0]?.message || 'Format PIN tidak valid (harus 4-6 digit angka).',
+    }
+  }
+
   const role = PIMPINAN_ROLES_CONFIG.find((r) => r.name === roleName)
 
   if (!role || !role.pin) {

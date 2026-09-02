@@ -150,3 +150,40 @@ describe('getDirectImageBase64', () => {
   }, 10000)
 })
 
+describe('Server Actions Zod Validation', () => {
+  it('rejects submitLaporan with invalid data', async () => {
+    const { submitLaporan } = await import('@/lib/actions')
+    const invalidForm = {
+      pegawai_id: '',
+      bidang: '',
+      jabatan: '',
+      jenis_penugasan: '',
+      tanggal_kegiatan: '02-09-2026', // invalid date
+      nama_kegiatan: '',
+      tempat_kegiatan: '',
+      penyelenggara: '',
+      tamu_undangan: '',
+      catatan_hasil: '',
+    }
+    const res = await submitLaporan(invalidForm)
+    expect(res.status).toBe('error')
+    expect(res.message).toBeDefined()
+  })
+
+  it('rejects updateEvaluasiPimpinan with invalid status or invalid row', async () => {
+    const { updateEvaluasiPimpinan } = await import('@/lib/actions')
+    const resInvalidRow = await updateEvaluasiPimpinan('-5', 'Selesai (Untuk Diketahui)', 'Catatan', 'Kadis')
+    expect(resInvalidRow.status).toBe('error')
+
+    const resInvalidStatus = await updateEvaluasiPimpinan('2', 'Status Non-Dinas', 'Catatan', 'Kadis')
+    expect(resInvalidStatus.status).toBe('error')
+  })
+
+  it('rejects loginPimpinan with invalid PIN format', async () => {
+    const { loginPimpinan } = await import('@/lib/actions')
+    const res = await loginPimpinan('Kepala Dinas', '12') // too short
+    expect(res.success).toBe(false)
+    expect(res.message).toContain('PIN')
+  })
+})
+

@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { FileSignature, Camera, FileText, Send, Loader2, Sparkles } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { submitLaporan } from '@/lib/actions'
+import { DESIGN_TOKENS } from '@/lib/design-tokens'
 import type { Pegawai } from '@/lib/types'
 
 interface InputFormClientProps {
@@ -101,7 +102,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         toast: true,
         position: 'top-end',
         icon: 'success',
-        title: 'Teks disempurnakan dengan AI ✨',
+        title: 'Teks disempurnakan dengan AI',
         showConfirmButton: false,
         timer: 3000,
       })
@@ -110,6 +111,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         icon: 'error',
         title: 'AI Gagal Memproses',
         text: error.message || 'Terjadi kesalahan saat menghubungi server AI.',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
       })
     } finally {
       setIsEnhancing(false)
@@ -118,73 +120,68 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const form = e.currentTarget
-
-    const docsInput = form.querySelector<HTMLInputElement>('input[name="file_dok"]')
-    const materiInput = form.querySelector<HTMLInputElement>('input[name="file_materi"]')
-    const docsFileList = Array.from(docsInput?.files || [])
-    const materiFileList = Array.from(materiInput?.files || [])
-
     setIsSubmitting(true)
 
+    const formData = new FormData(e.currentTarget)
+    const rawData = Object.fromEntries(formData.entries())
+    const docFiles = (formData.getAll('file_dok') as File[]).filter((f) => f && f.size > 0)
+    const matFiles = (formData.getAll('file_materi') as File[]).filter((f) => f && f.size > 0)
+
     try {
-      // Process documentation files
-      const docsPayload = await Promise.all(
-        docsFileList.map(async (file) => {
-          let processed = file
-          if (file.type.startsWith('image/')) {
-            processed = await compressImage(file, 1)
-          }
-          const b64 = await getBase64(processed)
-          return { base64: b64!, name: processed.name, mime: processed.type }
+      // Compress image files
+      const compressedDocFiles = await Promise.all(docFiles.map((file) => compressImage(file)))
+
+      const base64Docs = await Promise.all(
+        compressedDocFiles.map(async (file) => ({
+          base64: (await getBase64(file)) || '',
+          name: file.name,
+          mime: file.type || 'image/jpeg',
+        }))
+      )
+
+      const base64Mats = await Promise.all(
+        matFiles.map(async (file) => ({
+          base64: (await getBase64(file)) || '',
+          name: file.name,
+          mime: file.type || 'application/octet-stream',
+        }))
+      )
+
+      const selectedPeg = filteredPegawai.find((p) => p.id === rawData.pegawai_id)
+
+      const formPayload = {
+        pegawai_id: rawData.pegawai_id as string,
+        bidang: rawData.bidang as string,
+        jabatan: selectedPeg?.jabatan || '',
+        jenis_penugasan: rawData.jenis as string,
+        tanggal_kegiatan: rawData.tanggal as string,
+        nama_kegiatan: rawData.kegiatan as string,
+        tempat_kegiatan: rawData.tempat as string,
+        penyelenggara: rawData.penyelenggara as string,
+        tamu_undangan: (rawData.tamu as string) || '',
+        catatan_hasil: (rawData.catatan as string) || '',
+      }
+
+      const res = await submitLaporan(formPayload, base64Docs, base64Mats)
+      if (res.status === 'success') {
+        Swal.fire({
+          title: 'Berhasil!',
+          text: 'Laporan tersimpan.',
+          icon: 'success',
+          confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
         })
-      )
-
-      // Process materi files
-      const materiPayload = await Promise.all(
-        materiFileList.map(async (file) => {
-          const b64 = await getBase64(file)
-          return { base64: b64!, name: file.name, mime: file.type }
-        })
-      )
-
-      // Find selected pegawai
-      const pegawaiId = formData.get('pegawai_id') as string
-      const targetPegawai = pegawaiList.find((p) => p.id === pegawaiId)
-
-      const result = await submitLaporan(
-        {
-          pegawai_id: targetPegawai?.nama || pegawaiId,
-          bidang: formData.get('bidang') as string,
-          jabatan: targetPegawai?.jabatan || '',
-          jenis_penugasan: formData.get('jenis') as string,
-          tanggal_kegiatan: formData.get('tanggal') as string,
-          nama_kegiatan: formData.get('kegiatan') as string,
-          tempat_kegiatan: formData.get('tempat') as string,
-          penyelenggara: formData.get('penyelenggara') as string,
-          tamu_undangan: formData.get('tamu') as string,
-          catatan_hasil: formData.get('catatan') as string,
-        },
-        docsPayload,
-        materiPayload
-      )
-
-      if (result.status === 'success') {
-        Swal.fire({ title: 'Berhasil!', text: 'Laporan tersimpan.', icon: 'success', confirmButtonColor: '#1B3C73' })
         formRef.current?.reset()
-        setCatatanText('')
         setSelectedBidang('')
+        setCatatanText('')
       } else {
-        throw new Error(result.message)
+        throw new Error(res.message || 'Gagal menyimpan data ke Spreadsheet.')
       }
     } catch (error: any) {
-      console.error('Submission Error:', error)
       Swal.fire({
         title: 'Gagal Menyimpan',
-        text: error.message || 'Pastikan koneksi internet stabil atau kurangi ukuran file.',
+        text: error.message || 'Pastikan koneksi internet stabil atau kurangi ukuran file lampiran.',
         icon: 'error',
-        confirmButtonColor: '#1B3C73',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
       })
     } finally {
       setIsSubmitting(false)
@@ -195,26 +192,26 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
     <div className="relative">
       {isSubmitting && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center text-center max-w-sm w-11/12">
-            <Loader2 className="animate-spin text-amber-main mb-4" size={48} />
-            <h3 className="text-xl font-bold text-navy-main mb-2">Memproses</h3>
-            <p className="text-gray-500 text-sm">Mohon tunggu, sedang mengirim laporan...</p>
+          <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center text-center max-w-sm w-11/12 border border-slate-200">
+            <Loader2 className="animate-spin text-primary mb-4" size={48} />
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Memproses</h3>
+            <p className="text-slate-500 text-sm">Mohon tunggu, sedang mengirim laporan...</p>
           </div>
         </div>
       )}
 
-      <div className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden max-w-4xl mx-auto transition-all duration-300 ${isSubmitting ? 'blur-sm pointer-events-none' : ''}`}>
-        <div className="bg-navy-main px-6 py-4 border-b border-gray-100">
+      <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden max-w-4xl mx-auto transition-all duration-300 ${isSubmitting ? 'blur-sm pointer-events-none' : ''}`}>
+        <div className="bg-slate-900 px-6 py-4 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white flex items-center">
-            <FileSignature className="mr-3 text-amber-main" size={24} /> Formulir Laporan Penugasan
+            <FileSignature className="mr-3 text-primary" size={24} /> Formulir Laporan Penugasan
           </h2>
         </div>
 
         <form ref={formRef} onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="in_bidang" className="block text-sm font-semibold text-gray-700">
-                Bidang / Unit Kerja <span className="text-red-500">*</span>
+              <label htmlFor="in_bidang" className="block text-sm font-semibold text-slate-700">
+                Bidang / Unit Kerja <span className="text-destructive">*</span>
               </label>
               <select
                 name="bidang"
@@ -222,7 +219,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                 required
                 value={selectedBidang}
                 onChange={(e) => setSelectedBidang(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none"
               >
                 <option value="">-- Pilih Bidang --</option>
                 {bidangOptions.map((b) => (
@@ -231,15 +228,15 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
               </select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="in_nama" className="block text-sm font-semibold text-gray-700">
-                Nama Pegawai <span className="text-red-500">*</span>
+              <label htmlFor="in_nama" className="block text-sm font-semibold text-slate-700">
+                Nama Pegawai <span className="text-destructive">*</span>
               </label>
               <select
                 name="pegawai_id"
                 id="in_nama"
                 required
                 disabled={!selectedBidang}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none disabled:bg-gray-200 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none disabled:bg-slate-200 disabled:cursor-not-allowed"
               >
                 <option value="">-- Pilih Nama Pegawai --</option>
                 {filteredPegawai.map((p) => (
@@ -251,10 +248,10 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="in_jenis" className="block text-sm font-semibold text-gray-700">
-                Jenis Penugasan <span className="text-red-500">*</span>
+              <label htmlFor="in_jenis" className="block text-sm font-semibold text-slate-700">
+                Jenis Penugasan <span className="text-destructive">*</span>
               </label>
-              <select name="jenis" id="in_jenis" required className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none">
+              <select name="jenis" id="in_jenis" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none">
                 <option value="">-- Pilih Jenis --</option>
                 <option value="Rapat Koordinasi">Rapat Koordinasi</option>
                 <option value="Sosialisasi / Bimtek">Sosialisasi / Bimtek</option>
@@ -264,51 +261,51 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
               </select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="in_tanggal" className="block text-sm font-semibold text-gray-700">
-                Tanggal Kegiatan <span className="text-red-500">*</span>
+              <label htmlFor="in_tanggal" className="block text-sm font-semibold text-slate-700">
+                Tanggal Kegiatan <span className="text-destructive">*</span>
               </label>
-              <input type="date" name="tanggal" id="in_tanggal" required className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none" />
+              <input type="date" name="tanggal" id="in_tanggal" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="in_kegiatan" className="block text-sm font-semibold text-gray-700">
-              Nama Kegiatan <span className="text-red-500">*</span>
+            <label htmlFor="in_kegiatan" className="block text-sm font-semibold text-slate-700">
+              Nama Kegiatan <span className="text-destructive">*</span>
             </label>
-            <input type="text" name="kegiatan" id="in_kegiatan" placeholder="Contoh: Rapat Evaluasi Kinerja Triwulan III" required className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none" />
+            <input type="text" name="kegiatan" id="in_kegiatan" placeholder="Contoh: Rapat Evaluasi Kinerja Triwulan III" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="in_tempat" className="block text-sm font-semibold text-gray-700">
-                Tempat Kegiatan <span className="text-red-500">*</span>
+              <label htmlFor="in_tempat" className="block text-sm font-semibold text-slate-700">
+                Tempat Kegiatan <span className="text-destructive">*</span>
               </label>
-              <input type="text" name="tempat" id="in_tempat" placeholder="Contoh: Hotel Solo Paragon" required className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none" />
+              <input type="text" name="tempat" id="in_tempat" placeholder="Contoh: Hotel Solo Paragon" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
             </div>
             <div className="space-y-2">
-              <label htmlFor="in_penyelenggara" className="block text-sm font-semibold text-gray-700">
-                Penyelenggara Kegiatan <span className="text-red-500">*</span>
+              <label htmlFor="in_penyelenggara" className="block text-sm font-semibold text-slate-700">
+                Penyelenggara Kegiatan <span className="text-destructive">*</span>
               </label>
-              <input type="text" name="penyelenggara" id="in_penyelenggara" placeholder="Contoh: Disnaker Prov. Jateng" required className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none" />
+              <input type="text" name="penyelenggara" id="in_penyelenggara" placeholder="Contoh: Disnaker Prov. Jateng" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="in_tamu" className="block text-sm font-semibold text-gray-700">Tamu Undangan / Peserta yang Hadir</label>
-            <input type="text" name="tamu" id="in_tamu" placeholder="Contoh: Perwakilan OPD, Camat se-Surakarta" className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none" />
+            <label htmlFor="in_tamu" className="block text-sm font-semibold text-slate-700">Tamu Undangan / Peserta yang Hadir</label>
+            <input type="text" name="tamu" id="in_tamu" placeholder="Contoh: Perwakilan OPD, Camat se-Surakarta" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none" />
           </div>
 
           {/* Catatan + AI */}
           <div className="space-y-2">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-2 gap-2">
-              <label htmlFor="in_catatan" className="block text-sm font-semibold text-gray-700">
-                Catatan Hasil Kegiatan <span className="text-red-500">*</span>
+              <label htmlFor="in_catatan" className="block text-sm font-semibold text-slate-700">
+                Catatan Hasil Kegiatan <span className="text-destructive">*</span>
               </label>
               <button
                 type="button"
                 onClick={enhanceTextWithAI}
                 disabled={isEnhancing || !catatanText.trim() || isSubmitting}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-purple-600 hover:to-indigo-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-violet-600 hover:to-indigo-700 transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                 title="Perbaiki dan kembangkan poin kegiatan dengan AI"
               >
                 {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Perbaiki Teks dengan AI
@@ -322,35 +319,35 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
               onChange={(e) => setCatatanText(e.target.value)}
               placeholder="Tuliskan poin-poin penting hasil kegiatan di sini..."
               required
-              className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light bg-gray-50 focus:bg-white transition outline-none resize-y ${isEnhancing ? 'opacity-50' : ''}`}
+              className={`w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary bg-slate-50 focus:bg-white transition outline-none resize-y ${isEnhancing ? 'opacity-50' : ''}`}
               disabled={isEnhancing || isSubmitting}
             />
           </div>
 
           {/* File Uploads */}
-          <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-sky-50/50 p-6 rounded-xl border border-sky-100 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="in_file_dok" className="block text-sm font-bold text-navy-main flex items-center gap-1">
-                <Camera size={16} /> Dokumentasi (Foto)
+              <label htmlFor="in_file_dok" className="block text-sm font-bold text-slate-800 flex items-center gap-1">
+                <Camera size={16} className="text-primary" /> Dokumentasi (Foto)
               </label>
-              <input multiple type="file" name="file_dok" id="in_file_dok" accept="image/*" className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-navy-main file:text-white hover:file:bg-navy-dark cursor-pointer border border-dashed border-gray-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-navy-main" />
-              <p className="text-xs text-gray-500 mt-1">Bisa pilih lebih dari 1 foto. Otomatis dikompres.</p>
+              <input multiple type="file" name="file_dok" id="in_file_dok" accept="image/*" className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover cursor-pointer border border-dashed border-slate-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-primary" />
+              <p className="text-xs text-slate-500 mt-1">Bisa pilih lebih dari 1 foto. Otomatis dikompres.</p>
             </div>
             <div className="space-y-2">
-              <label htmlFor="in_file_materi" className="block text-sm font-bold text-navy-main flex items-center gap-1">
-                <FileText size={16} /> Materi (PDF/Docx) <span className="text-xs font-normal text-gray-500">- Opsional</span>
+              <label htmlFor="in_file_materi" className="block text-sm font-bold text-slate-800 flex items-center gap-1">
+                <FileText size={16} className="text-primary" /> Materi (PDF/Docx) <span className="text-xs font-normal text-slate-500">- Opsional</span>
               </label>
-              <input multiple type="file" name="file_materi" id="in_file_materi" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 cursor-pointer border border-dashed border-gray-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-navy-main" />
-              <p className="text-xs text-gray-500 mt-1">Bisa pilih lebih dari 1 file. Maks 5MB/file.</p>
+              <input multiple type="file" name="file_materi" id="in_file_materi" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer border border-dashed border-slate-300 rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-primary" />
+              <p className="text-xs text-slate-500 mt-1">Bisa pilih lebih dari 1 file. Maks 5MB/file.</p>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-navy-main text-white py-4 rounded-xl font-bold text-lg hover:bg-navy-dark disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex justify-center items-center gap-2 outline-none focus:ring-4 focus:ring-blue-300"
+            className="w-full bg-primary text-primary-foreground py-4 rounded-xl font-bold text-lg hover:bg-primary-hover disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-lg flex justify-center items-center gap-2 outline-none focus:ring-4 focus:ring-primary/30"
           >
-            {isSubmitting ? <><Loader2 className="animate-spin" /> Sedang Memproses...</> : <><Send /> Kirim Laporan Penugasan</>}
+            {isSubmitting ? <><Loader2 className="animate-spin" /> Sedang Memproses...</> : <><Send size={20} /> Kirim Laporan Penugasan</>}
           </button>
         </form>
       </div>

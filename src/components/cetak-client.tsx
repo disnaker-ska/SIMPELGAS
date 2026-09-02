@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { Printer, Search, Calendar, PinIcon, Loader2 } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { getLaporanByPegawaiId, getDirectImageBase64 } from '@/lib/actions'
-import type { Pegawai, Laporan } from '@/lib/types'
 import { formatRichTextForPrint } from '@/lib/print-utils'
+import { DESIGN_TOKENS } from '@/lib/design-tokens'
+import type { Pegawai, Laporan } from '@/lib/types'
 
 interface CetakClientProps {
   pegawaiList: Pegawai[]
@@ -64,7 +65,7 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
 
       // Preload dokumentasi gambar ke Base64 via Server Action (bebas CORS & adblocker)
       const base64Images = await Promise.all(
-        (lap.dokumentasi_urls || []).map(async (url) => {
+        (lap.dokumentasi_urls || []).map(async (url: string) => {
           const b64 = await getDirectImageBase64(url)
           if (b64) return { src: b64, isDoc: false }
           return { src: url, isDoc: true }
@@ -281,7 +282,7 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
               <div style="margin-top: 12px;">
                 <span class="section-heading">D. Lampiran Dokumentasi Kegiatan:</span>
                 <div class="doc-grid">
-                  ${base64Images.map((img, idx) => {
+                  ${base64Images.map((img: { src: string; isDoc: boolean }, idx: number) => {
                     if (!img.isDoc) {
                       return `
                         <div class="doc-item">
@@ -305,7 +306,7 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
               <div style="margin-top: 12px;">
                 <span class="section-heading">E. Materi Pendukung:</span>
                 <ul class="materi-list">
-                  ${lap.materi_urls.map(url => `<li><a href="${url}" target="_blank">${url}</a></li>`).join('')}
+                  ${lap.materi_urls.map((url: string) => `<li><a href="${url}" target="_blank">${url}</a></li>`).join('')}
                 </ul>
               </div>
             ` : ''}
@@ -332,39 +333,44 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
     } catch (err) {
       console.error('Error saat menyiapkan cetak:', err)
       setPrintingId(null)
-      Swal.fire({ icon: 'error', title: 'Gagal', text: 'Terjadi kesalahan saat memproses dokumen cetak.' })
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal',
+        text: 'Terjadi kesalahan saat memproses dokumen cetak.',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+      })
     }
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 max-w-4xl mx-auto">
-      <div className="flex items-center mb-6 border-b pb-4">
-        <Printer className="text-2xl text-navy-main mr-3" size={32} />
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 max-w-4xl mx-auto">
+      <div className="flex items-center mb-6 border-b border-slate-100 pb-4">
+        <Printer className="text-2xl text-primary mr-3" size={32} />
         <div>
-          <h2 className="text-xl font-bold text-navy-main">Cetak Laporan</h2>
-          <p className="text-sm text-gray-500">Pilih nama pegawai untuk melihat dan mencetak riwayat penugasan.</p>
+          <h2 className="text-xl font-bold text-slate-900">Cetak Laporan</h2>
+          <p className="text-sm text-slate-500">Pilih nama pegawai untuk melihat dan mencetak riwayat penugasan.</p>
         </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="w-full md:w-2/5">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Bidang / Unit Kerja</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Bidang / Unit Kerja</label>
           <select
             value={selectedBidang}
             onChange={(e) => { setSelectedBidang(e.target.value); setSelectedPegawaiId('') }}
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light outline-none bg-gray-50"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-slate-50 focus:bg-white transition"
           >
             <option value="">-- Semua Bidang --</option>
             {bidangOptions.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
         <div className="w-full md:w-2/5">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Pegawai</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pegawai</label>
           <select
             value={selectedPegawaiId}
             onChange={(e) => setSelectedPegawaiId(e.target.value)}
             disabled={!selectedBidang}
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-navy-light outline-none bg-gray-50 disabled:bg-gray-200 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-slate-50 focus:bg-white transition disabled:bg-slate-200 disabled:cursor-not-allowed"
           >
             <option value="">-- Pilih Pegawai --</option>
             {filteredPegawai.map((p) => <option key={p.id} value={p.id}>{p.nama}</option>)}
@@ -374,14 +380,14 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
           <button
             onClick={cariLaporan}
             disabled={isLoading || !selectedPegawaiId}
-            className="w-full bg-navy-main hover:bg-navy-dark text-white font-semibold py-3 px-8 rounded-xl transition shadow-md flex items-center justify-center disabled:opacity-75"
+            className="w-full bg-primary hover:bg-primary-hover text-primary-foreground font-semibold py-3 px-8 rounded-xl transition shadow-md flex items-center justify-center disabled:opacity-75 cursor-pointer"
           >
             {isLoading ? <Loader2 className="animate-spin mr-2" /> : <Search className="mr-2" size={18} />} Cari
           </button>
         </div>
       </div>
 
-      {searchMsg && <div className="text-center font-medium text-red-500 my-4">{searchMsg}</div>}
+      {searchMsg && <div className="text-center font-medium text-destructive my-4">{searchMsg}</div>}
 
       <div className="space-y-4">
         {laporanList.map((lap) => {
@@ -390,13 +396,13 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
           const isPrintingThis = printingId === lap.id
 
           return (
-            <div key={lap.id} className="bg-white border border-gray-200 p-5 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition">
+            <div key={lap.id} className="bg-white border border-slate-200 p-5 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition">
               <div>
-                <h3 className="font-bold text-navy-dark text-lg">{lap.nama_kegiatan || '-'}</h3>
-                <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-500">
+                <h3 className="font-bold text-slate-900 text-lg">{lap.nama_kegiatan || '-'}</h3>
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-slate-500">
                   <span className="flex items-center"><Calendar size={14} className="mr-1" /> {tanggal}</span>
-                  <span className="px-2 py-1 bg-gray-100 rounded-md border text-xs font-medium flex items-center"><PinIcon size={12} className="mr-1" /> {lap.jenis_penugasan || '-'}</span>
-                  <span className={`px-2 py-1 rounded-md border text-xs font-bold ${isPerlu ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
+                  <span className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200 text-xs font-medium flex items-center"><PinIcon size={12} className="mr-1" /> {lap.jenis_penugasan || '-'}</span>
+                  <span className={`px-2 py-1 rounded-md border text-xs font-bold ${isPerlu ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                     {isPerlu ? 'Perlu Tindak Lanjut' : 'Untuk Diketahui'}
                   </span>
                 </div>
@@ -404,7 +410,7 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
               <button
                 onClick={() => prosesCetak(lap)}
                 disabled={isPrintingThis}
-                className="flex-1 md:flex-none px-4 py-2 bg-navy-main text-white rounded-lg text-sm font-semibold hover:bg-navy-dark transition flex items-center justify-center shadow-md disabled:opacity-75"
+                className="flex-1 md:flex-none px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary-hover transition flex items-center justify-center shadow-md disabled:opacity-75 cursor-pointer"
               >
                 {isPrintingThis ? (
                   <>
