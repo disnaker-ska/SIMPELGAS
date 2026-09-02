@@ -1,76 +1,51 @@
 'use server'
 
-import { createServerSupabaseClient } from './supabase'
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
-import type { Pegawai, Laporan, DashboardStats, LaporanFormData, KegiatanInternal, KegiatanInternalFormData } from './types'
+import { cookies } from 'next/headers'
+import type {
+  Pegawai,
+  Laporan,
+  DashboardStats,
+  LaporanFormData,
+  KegiatanInternal,
+  KegiatanInternalFormData,
+} from './types'
+import {
+  fetchPegawaiFromAppsScript,
+  fetchLaporanFromAppsScript,
+  submitLaporanToAppsScript,
+  updateEvaluasiInAppsScript,
+  type AppsScriptFilePayload,
+} from './appscript'
 
 // ============================================================
-// DATA FETCHING
+// DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET)
 // ============================================================
 
 export async function getPegawai(): Promise<Pegawai[]> {
   noStore()
-  const supabase = createServerSupabaseClient()
-  const { data, error } = await supabase
-    .from('pegawai')
-    .select('*')
-    .eq('is_active', true)
-    .order('bidang')
-    .order('nama')
-
-  if (error) {
-    console.error('Error fetching pegawai:', error)
-    return []
-  }
-  return data || []
+  return fetchPegawaiFromAppsScript()
 }
 
 export async function getLaporan(namaPegawai?: string): Promise<Laporan[]> {
   noStore()
-  const supabase = createServerSupabaseClient()
-  let query = supabase
-    .from('laporan')
-    .select('*, pegawai(nama, bidang, jabatan)')
-    .order('created_at', { ascending: false })
-
-  if (namaPegawai) {
-    // Filter by pegawai nama via joined table
-    query = query.eq('pegawai.nama', namaPegawai)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('Error fetching laporan:', error)
-    return []
-  }
-  return data || []
+  return fetchLaporanFromAppsScript(namaPegawai)
 }
 
 export async function getAllLaporan(): Promise<Laporan[]> {
   noStore()
-  const supabase = createServerSupabaseClient()
-  const { data, error } = await supabase
-    .from('laporan')
-    .select('*, pegawai(nama, bidang, jabatan)')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching all laporan:', error)
-    return []
-  }
-  return data || []
+  return fetchLaporanFromAppsScript()
 }
 
 export async function getDashboardStats(laporanData: Laporan[]): Promise<DashboardStats> {
   const totalLaporan = laporanData.length
   const uniqueNames = new Set(
     laporanData
-      .map(l => l.pegawai?.nama)
+      .map((l) => l.pegawai?.nama || l.pegawai_id)
       .filter(Boolean)
   )
   const totalDievaluasi = laporanData.filter(
-    l => l.catatan_pimpinan && l.catatan_pimpinan.trim() !== ''
+    (l) => l.catatan_pimpinan && l.catatan_pimpinan.trim() !== ''
   ).length
 
   return {
@@ -80,43 +55,62 @@ export async function getDashboardStats(laporanData: Laporan[]): Promise<Dashboa
   }
 }
 
+export async function getLaporanByPegawaiId(pegawaiId: string): Promise<Laporan[]> {
+  noStore()
+  const all = await fetchLaporanFromAppsScript()
+  return all.filter((l) => l.pegawai_id === pegawaiId || l.pegawai?.nama === pegawaiId)
+}
+
 // ============================================================
-// DATA MUTATION
+// DATA MUTATION (SUBMIT LAPORAN & GOOGLE DRIVE UPLOAD)
 // ============================================================
 
-export async function submitLaporan(formData: LaporanFormData, dokUrls: string[], materiUrls: string[]) {
-  const supabase = createServerSupabaseClient()
+export async function submitLaporan(
+  formData: LaporanFormData,
+  dokFiles: AppsScriptFilePayload[] | any[] = [],
+  materiFiles: AppsScriptFilePayload[] | any[] = []
+) {
+  // Pastikan payload file berformat AppsScriptFilePayload
+  const dokumentasi: AppsScriptFilePayload[] = dokFiles
+    .filter((f) => f && typeof f === 'object' && f.base64)
+    .map((f) => ({
+      base64: f.base64,
+      name: f.name || 'dokumentasi.jpg',
+      mime: f.mime || 'image/jpeg',
+    }))
 
-  const { data, error } = await supabase
-    .from('laporan')
-    .insert({
-      pegawai_id: formData.pegawai_id,
-      bidang: formData.bidang,
-      jabatan: formData.jabatan,
-      jenis_penugasan: formData.jenis_penugasan,
-      tanggal_kegiatan: formData.tanggal_kegiatan,
-      nama_kegiatan: formData.nama_kegiatan,
-      tempat_kegiatan: formData.tempat_kegiatan,
-      penyelenggara: formData.penyelenggara,
-      tamu_undangan: formData.tamu_undangan || null,
-      catatan_hasil: formData.catatan_hasil || null,
-      dokumentasi_urls: dokUrls.length > 0 ? dokUrls : null,
-      materi_urls: materiUrls.length > 0 ? materiUrls : null,
-      status_tindak_lanjut: 'Untuk Diketahui',
-    })
-    .select()
-    .single()
+  const materi: AppsScriptFilePayload[] = materiFiles
+    .filter((f) => f && typeof f === 'object' && f.base64)
+    .map((f) => ({
+      base64: f.base64,
+      name: f.name || 'materi.pdf',
+      mime: f.mime || 'application/pdf',
+    }))
 
-  if (error) {
-    console.error('Error submitting laporan:', error)
-    return { status: 'error', message: error.message }
+  // Temukan nama pegawai dari id / nama
+  const namaPegawai = formData.pegawai_id
+
+  const res = await submitLaporanToAppsScript({
+    namaPegawai,
+    bidang: formData.bidang,
+    jenisPenugasan: formData.jenis_penugasan,
+    tanggalKegiatan: formData.tanggal_kegiatan,
+    namaKegiatan: formData.nama_kegiatan,
+    tempatKegiatan: formData.tempat_kegiatan,
+    penyelenggara: formData.penyelenggara,
+    tamuUndangan: formData.tamu_undangan,
+    catatanHasil: formData.catatan_hasil,
+    dokumentasi,
+    materi,
+  })
+
+  if (res.status === 'success') {
+    revalidatePath('/dashboard')
+    revalidatePath('/cetak')
+    revalidatePath('/pimpinan')
   }
 
-  revalidatePath('/dashboard')
-  revalidatePath('/cetak')
-  revalidatePath('/pimpinan')
-
-  return { status: 'success', data }
+  return res
 }
 
 export async function updateEvaluasiPimpinan(
@@ -125,250 +119,84 @@ export async function updateEvaluasiPimpinan(
   catatanBaru: string,
   roleName: string
 ) {
-  const supabase = createServerSupabaseClient()
+  const row = parseInt(laporanId, 10)
+  if (isNaN(row)) {
+    return { status: 'error', message: 'Row ID Laporan tidak valid.' }
+  }
 
-  // Fetch current catatan to append
-  const { data: current } = await supabase
-    .from('laporan')
-    .select('catatan_pimpinan')
-    .eq('id', laporanId)
-    .single()
-
+  // Ambil laporan saat ini untuk menyambung catatan pimpinan yang sudah ada
+  const all = await fetchLaporanFromAppsScript()
+  const current = all.find((l) => l.id === laporanId)
   const existingNotes = current?.catatan_pimpinan
     ? current.catatan_pimpinan.trim() + '\n\n'
     : ''
   const appendedNote = existingNotes + `[${roleName}]: ${catatanBaru.trim()}`
 
-  const { error } = await supabase
-    .from('laporan')
-    .update({
-      status_tindak_lanjut: status,
-      catatan_pimpinan: appendedNote,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', laporanId)
+  const res = await updateEvaluasiInAppsScript(row, status, appendedNote)
 
-  if (error) {
-    console.error('Error updating evaluasi:', error)
-    return { status: 'error', message: error.message }
+  if (res.status === 'success') {
+    revalidatePath('/dashboard')
+    revalidatePath('/pimpinan')
+    revalidatePath('/cetak')
   }
 
-  revalidatePath('/dashboard')
-  revalidatePath('/pimpinan')
-
-  return { status: 'success' }
+  return res
 }
 
 // ============================================================
-// FILE UPLOAD — Supabase Storage
+// STUBS FILE UPLOAD (LEGACY SUPABASE REPLACEMENT)
 // ============================================================
 
 export async function uploadFile(
-  bucket: string,
-  fileName: string,
-  fileBase64: string,
-  mimeType: string
+  _bucket: string,
+  _fileName: string,
+  _fileBase64: string,
+  _mimeType: string
 ): Promise<string | null> {
-  const supabase = createServerSupabaseClient()
-
-  // Decode base64 to buffer
-  const buffer = Buffer.from(fileBase64, 'base64')
-  const uniqueName = `${Date.now()}_${fileName}`
-
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(uniqueName, buffer, {
-      contentType: mimeType,
-      upsert: false,
-    })
-
-  if (error) {
-    console.error(`Error uploading to ${bucket}:`, error)
-    return null
-  }
-
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(uniqueName)
-
-  return urlData.publicUrl
+  return null
 }
 
 export async function uploadFiles(
-  bucket: string,
-  files: Array<{ base64: string; name: string; mime: string }>
+  _bucket: string,
+  _files: Array<{ base64: string; name: string; mime: string }>
 ): Promise<string[]> {
-  const urls: string[] = []
-  for (const file of files) {
-    const url = await uploadFile(bucket, file.name, file.base64, file.mime)
-    if (url) urls.push(url)
-  }
-  return urls
+  return []
 }
 
 // ============================================================
-// SEARCH LAPORAN BY PEGAWAI
+// STUBS KEGIATAN INTERNAL (NON-ACTIVE)
 // ============================================================
-
-export async function getLaporanByPegawaiId(pegawaiId: string): Promise<Laporan[]> {
-  const supabase = createServerSupabaseClient()
-  const { data, error } = await supabase
-    .from('laporan')
-    .select('*, pegawai(nama, bidang, jabatan)')
-    .eq('pegawai_id', pegawaiId)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching laporan by pegawai:', error)
-    return []
-  }
-  return data || []
-}
-// ============================================================
-// KEGIATAN INTERNAL — CRUD
-// ============================================================
-
-function calculateSpjStatus(
-  daftarHadir: string[],
-  undangan: string[],
-  fotoKegiatan: string[],
-  notulen: string[],
-  fotoJamuan: string[]
-): string {
-  const fields = [daftarHadir, undangan, fotoKegiatan, notulen, fotoJamuan]
-  const filled = fields.filter(f => f && f.length > 0).length
-  if (filled === 0) return 'Belum Lengkap'
-  if (filled === 5) return 'Lengkap'
-  return 'Sebagian'
-}
 
 export async function submitKegiatanInternal(
-  formData: KegiatanInternalFormData,
-  daftarHadirUrls: string[],
-  undanganUrls: string[],
-  fotoKegiatanUrls: string[],
-  notulenUrls: string[],
-  fotoJamuanUrls: string[]
+  _formData: KegiatanInternalFormData,
+  _daftarHadirUrls: string[],
+  _undanganUrls: string[],
+  _fotoKegiatanUrls: string[],
+  _notulenUrls: string[],
+  _fotoJamuanUrls: string[]
 ) {
-  const supabase = createServerSupabaseClient()
-
-  const statusSpj = calculateSpjStatus(
-    daftarHadirUrls, undanganUrls, fotoKegiatanUrls, notulenUrls, fotoJamuanUrls
-  )
-
-  const { data, error } = await supabase
-    .from('kegiatan_internal')
-    .insert({
-      jenis_kegiatan: formData.jenis_kegiatan,
-      nama_kegiatan: formData.nama_kegiatan,
-      tanggal_kegiatan: formData.tanggal_kegiatan,
-      waktu_mulai: formData.waktu_mulai || null,
-      waktu_selesai: formData.waktu_selesai || null,
-      tempat_kegiatan: formData.tempat_kegiatan,
-      bidang: formData.bidang,
-      pic_pegawai_id: formData.pic_pegawai_id || null,
-      agenda: formData.agenda || null,
-      hasil_kegiatan: formData.hasil_kegiatan || null,
-      peserta: formData.peserta || null,
-      jumlah_peserta: formData.jumlah_peserta || null,
-      daftar_hadir_urls: daftarHadirUrls.length > 0 ? daftarHadirUrls : null,
-      undangan_urls: undanganUrls.length > 0 ? undanganUrls : null,
-      foto_kegiatan_urls: fotoKegiatanUrls.length > 0 ? fotoKegiatanUrls : null,
-      notulen_urls: notulenUrls.length > 0 ? notulenUrls : null,
-      foto_jamuan_urls: fotoJamuanUrls.length > 0 ? fotoJamuanUrls : null,
-      status_spj: statusSpj,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error submitting kegiatan internal:', error)
-    return { status: 'error', message: error.message }
-  }
-
-  revalidatePath('/dashboard')
-  revalidatePath('/input/monitoring')
-  revalidatePath('/pimpinan')
-
-  return { status: 'success', data }
+  return { status: 'success', message: 'Fitur monitoring internal dinonaktifkan.' }
 }
 
 export async function getAllKegiatanInternal(): Promise<KegiatanInternal[]> {
-  noStore()
-  const supabase = createServerSupabaseClient()
-  const { data, error } = await supabase
-    .from('kegiatan_internal')
-    .select('*, pegawai:pic_pegawai_id(nama, bidang, jabatan)')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching kegiatan internal:', error)
-    return []
-  }
-  return data || []
+  return []
 }
 
-export async function getKegiatanInternalById(id: string): Promise<KegiatanInternal | null> {
-  noStore()
-  const supabase = createServerSupabaseClient()
-  const { data, error } = await supabase
-    .from('kegiatan_internal')
-    .select('*, pegawai:pic_pegawai_id(nama, bidang, jabatan)')
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    console.error('Error fetching kegiatan internal by id:', error)
-    return null
-  }
-  return data
+export async function getKegiatanInternalById(_id: string): Promise<KegiatanInternal | null> {
+  return null
 }
 
 export async function updateEvaluasiKegiatanInternal(
-  kegiatanId: string,
-  catatanBaru: string,
-  roleName: string
+  _kegiatanId: string,
+  _catatanBaru: string,
+  _roleName: string
 ) {
-  const supabase = createServerSupabaseClient()
-
-  // Fetch current catatan to append
-  const { data: current } = await supabase
-    .from('kegiatan_internal')
-    .select('catatan_pimpinan')
-    .eq('id', kegiatanId)
-    .single()
-
-  const existingNotes = current?.catatan_pimpinan
-    ? current.catatan_pimpinan.trim() + '\n\n'
-    : ''
-  const appendedNote = existingNotes + `[${roleName}]: ${catatanBaru.trim()}`
-
-  const { error } = await supabase
-    .from('kegiatan_internal')
-    .update({
-      catatan_pimpinan: appendedNote,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', kegiatanId)
-
-  if (error) {
-    console.error('Error updating evaluasi kegiatan internal:', error)
-    return { status: 'error', message: error.message }
-  }
-
-  revalidatePath('/dashboard')
-  revalidatePath('/pimpinan')
-  revalidatePath('/input/monitoring')
-
   return { status: 'success' }
 }
 
 // ============================================================
 // PIMPINAN AUTHENTICATION (SERVER SIDE + COOKIES)
 // ============================================================
-
-import { cookies } from 'next/headers'
 
 const PIMPINAN_ROLES_CONFIG = [
   { name: 'Kepala Dinas', pin: process.env.PIN_KEPALA_DINAS, scopes: ['ALL'] },
@@ -380,9 +208,8 @@ const PIMPINAN_ROLES_CONFIG = [
 ]
 
 export async function loginPimpinan(roleName: string, pin: string) {
-  const role = PIMPINAN_ROLES_CONFIG.find(r => r.name === roleName)
+  const role = PIMPINAN_ROLES_CONFIG.find((r) => r.name === roleName)
 
-  // Jika env variable tidak di-set, tolak login dan log error — jangan fallback diam-diam
   if (!role || !role.pin) {
     console.error(`[AUTH] PIN untuk role "${roleName}" tidak ditemukan di environment variables.`)
     return { success: false, message: 'Konfigurasi server belum lengkap. Hubungi administrator.' }
@@ -392,18 +219,22 @@ export async function loginPimpinan(roleName: string, pin: string) {
     return { success: false, message: 'PIN Salah atau Jabatan tidak ditemukan.' }
   }
 
-  // Set httpOnly cookie (tidak bisa diakses JS browser)
   const cookieStore = await cookies()
-  cookieStore.set('pimpinan_session', JSON.stringify({
-    role: role.name,
-    scopes: role.scopes
-  }), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 8, // 8 Jam
-    path: '/',
-  })
+  cookieStore.set(
+    'pimpinan_session',
+    JSON.stringify({
+      role: role.name,
+      scopes: role.scopes,
+      loggedInAt: Date.now(),
+    }),
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 8, // 8 jam
+    }
+  )
 
   return { success: true }
 }
@@ -411,15 +242,24 @@ export async function loginPimpinan(roleName: string, pin: string) {
 export async function logoutPimpinan() {
   const cookieStore = await cookies()
   cookieStore.delete('pimpinan_session')
-  revalidatePath('/pimpinan')
+  return { success: true }
 }
 
-export async function getPimpinanSession() {
+export async function getPimpinanSession(): Promise<{
+  role: string
+  scopes: string[]
+} | null> {
   const cookieStore = await cookies()
-  const session = cookieStore.get('pimpinan_session')
-  if (!session) return null
+  const sessionCookie = cookieStore.get('pimpinan_session')
+
+  if (!sessionCookie) return null
+
   try {
-    return JSON.parse(session.value) as { role: string; scopes: string[] }
+    const session = JSON.parse(sessionCookie.value)
+    return {
+      role: session.role,
+      scopes: session.scopes,
+    }
   } catch {
     return null
   }
