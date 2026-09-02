@@ -7,17 +7,8 @@
  */
 export function getDriveFileId(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null
-  const patterns = [
-    /[?&]id=([-\w]+)/,
-    /\/file\/d\/([-\w]+)/,
-    /\/d\/([-\w]+)/,
-    /\/uc\?.*?id=([-\w]+)/,
-  ]
-  for (const p of patterns) {
-    const match = url.match(p)
-    if (match && match[1].length >= 10) return match[1]
-  }
-  return null
+  const match = url.match(/[?&]id=([-\w]+)/) || url.match(/\/d\/([-\w]+)/)
+  return match && match[1].length >= 10 ? match[1] : null
 }
 
 /**
@@ -27,21 +18,10 @@ export function getDriveFileId(url?: string | null): string | null {
 export function getDriveDirectImageUrl(url: string, width = 800): string | null {
   if (!url) return null
   if (url.includes('.supabase.co/storage/')) return url
-  if (
-    url.includes('/presentation/') ||
-    url.includes('/document/') ||
-    url.includes('/spreadsheets/')
-  ) {
-    return null
-  }
+  if (/\/(presentation|document|spreadsheets)\//.test(url)) return null
   const id = getDriveFileId(url)
-  if (id) {
-    return `https://lh3.googleusercontent.com/d/${id}=w${width}`
-  }
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url
-  }
-  return null
+  if (id) return `https://lh3.googleusercontent.com/d/${id}=w${width}`
+  return url.startsWith('http') ? url : null
 }
 
 /**

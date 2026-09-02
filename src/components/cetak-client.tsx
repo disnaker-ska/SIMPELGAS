@@ -3,13 +3,9 @@
 import { useState } from 'react'
 import { Printer, Search, Calendar, PinIcon, Loader2 } from 'lucide-react'
 import Swal from 'sweetalert2'
-import { getLaporanByPegawaiId } from '@/lib/actions'
+import { getLaporanByPegawaiId, getDirectImageBase64 } from '@/lib/actions'
 import type { Pegawai, Laporan } from '@/lib/types'
-import {
-  getDriveDirectImageUrl,
-  convertImageUrlToBase64,
-  formatRichTextForPrint,
-} from '@/lib/print-utils'
+import { formatRichTextForPrint } from '@/lib/print-utils'
 
 interface CetakClientProps {
   pegawaiList: Pegawai[]
@@ -66,19 +62,14 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
           })
         : '-'
 
-      // Preload dokumentasi gambar ke Base64 agar 100% muncul di preview/cetak
-      const base64Images: { src: string; isDoc: boolean }[] = []
-      if (lap.dokumentasi_urls && lap.dokumentasi_urls.length > 0) {
-        for (const url of lap.dokumentasi_urls) {
-          const directUrl = getDriveDirectImageUrl(url, 800)
-          if (directUrl) {
-            const b64 = await convertImageUrlToBase64(directUrl)
-            base64Images.push({ src: b64, isDoc: false })
-          } else {
-            base64Images.push({ src: url, isDoc: true })
-          }
-        }
-      }
+      // Preload dokumentasi gambar ke Base64 via Server Action (bebas CORS & adblocker)
+      const base64Images = await Promise.all(
+        (lap.dokumentasi_urls || []).map(async (url) => {
+          const b64 = await getDirectImageBase64(url)
+          if (b64) return { src: b64, isDoc: false }
+          return { src: url, isDoc: true }
+        })
+      )
 
       const oldIframe = document.getElementById('print-iframe')
       if (oldIframe) document.body.removeChild(oldIframe)
@@ -87,8 +78,10 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
       iframe.style.position = 'fixed'
       iframe.style.right = '0'
       iframe.style.bottom = '0'
-      iframe.style.width = '0'
-      iframe.style.height = '0'
+      iframe.style.width = '210mm'
+      iframe.style.height = '297mm'
+      iframe.style.opacity = '0'
+      iframe.style.pointerEvents = 'none'
       iframe.style.border = '0'
       iframe.id = 'print-iframe'
       document.body.appendChild(iframe)
@@ -335,7 +328,7 @@ export function CetakClient({ pegawaiList }: CetakClientProps) {
         iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
         setPrintingId(null)
-      }, 300)
+      }, 500)
     } catch (err) {
       console.error('Error saat menyiapkan cetak:', err)
       setPrintingId(null)

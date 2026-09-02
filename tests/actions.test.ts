@@ -114,3 +114,28 @@ describe('normalizePersonName', () => {
     expect(normalizePersonName('Pramutedy Sukoco, S.E., M.Si., CGRS')).toBe('pramutedysukoco')
   })
 })
+
+describe('getDirectImageBase64', () => {
+  it('returns data url for mocked fetch response', async () => {
+    const { getDirectImageBase64 } = await import('@/lib/actions')
+    const originalFetch = global.fetch
+    global.fetch = async () =>
+      new Response(Buffer.from('fake-image-bytes'), {
+        status: 200,
+        headers: { 'Content-Type': 'image/jpeg' },
+      })
+
+    const result = await getDirectImageBase64(
+      'https://drive.google.com/open?id=1JR4Gf_yt4jKlsL8SaN_jTWNv_JOp29TT'
+    )
+    expect(result).toContain('data:image/jpeg;base64,')
+
+    global.fetch = originalFetch
+  })
+
+  it('returns null for empty or invalid input', async () => {
+    const { getDirectImageBase64 } = await import('@/lib/actions')
+    expect(await getDirectImageBase64('')).toBeNull()
+  })
+})
+

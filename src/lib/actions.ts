@@ -18,6 +18,7 @@ import {
   normalizePersonName,
   type AppsScriptFilePayload,
 } from './appscript'
+import { getDriveFileId } from './print-utils'
 
 // ============================================================
 // DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET)
@@ -273,6 +274,34 @@ export async function getPimpinanSession(): Promise<{
       scopes: session.scopes,
     }
   } catch {
+    return null
+  }
+}
+
+/**
+ * Server Action untuk mengunduh gambar Google Drive di level Node.js server
+ * dan mengonversinya ke format Base64 Data URL, kebal terhadap blokir CORS/iframe browser
+ */
+export async function getDirectImageBase64(url: string): Promise<string | null> {
+  if (!url) return null
+  if (url.startsWith('data:image/')) return url
+  const id = getDriveFileId(url)
+  const fetchUrl = id ? `https://lh3.googleusercontent.com/d/${id}=w800` : url
+
+  try {
+    const res = await fetch(fetchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      },
+      next: { revalidate: 86400 },
+    })
+    if (!res.ok) return null
+    const arrayBuffer = await res.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    const contentType = res.headers.get('content-type') || 'image/jpeg'
+    return `data:${contentType};base64,${base64}`
+  } catch (err) {
+    console.error('[getDirectImageBase64] Error fetching image:', err)
     return null
   }
 }
