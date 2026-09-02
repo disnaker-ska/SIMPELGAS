@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   FileSignature,
   Camera,
@@ -24,6 +24,121 @@ import { useSpeechToText } from '@/lib/use-speech-to-text'
 import { AiCompareModal } from '@/components/ui/ai-compare-modal'
 import { FilePreviewModal } from '@/components/ui/file-preview-modal'
 import type { Pegawai } from '@/lib/types'
+
+function PhotoThumbnail({
+  file,
+  onRemove,
+  onPreview,
+  formatSize,
+}: {
+  file: File
+  onRemove: () => void
+  onPreview: (url: string) => void
+  formatSize: (bytes: number) => string
+}) {
+  const [url, setUrl] = useState<string>('')
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file)
+    setUrl(objectUrl)
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [file])
+
+  if (!url) return null
+
+  return (
+    <div className="group relative aspect-square rounded-md overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={file.name} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPreview(url)}
+          className="p-1 rounded bg-white/90 text-slate-800 hover:text-primary transition cursor-pointer"
+          title="Lihat foto besar"
+        >
+          <Eye size={12} />
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="p-1 rounded bg-white/90 text-rose-600 hover:text-rose-700 transition cursor-pointer"
+          title="Hapus foto ini"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+      <span className="absolute bottom-0.5 left-0.5 text-[8px] bg-slate-900/70 text-white px-1 rounded truncate max-w-[90%]">
+        {formatSize(file.size)}
+      </span>
+    </div>
+  )
+}
+
+function MaterialItem({
+  file,
+  onRemove,
+  onPreview,
+  formatSize,
+}: {
+  file: File
+  onRemove: () => void
+  onPreview: (url: string) => void
+  formatSize: (bytes: number) => string
+}) {
+  const isPdf = file.name.toLowerCase().endsWith('.pdf')
+  const isExcel = /\.(xls|xlsx)$/i.test(file.name)
+  const isWord = /\.(doc|docx)$/i.test(file.name)
+
+  const handlePreview = () => {
+    const url = URL.createObjectURL(file)
+    onPreview(url)
+  }
+
+  return (
+    <div className="flex items-center justify-between p-1.5 bg-white rounded-md border border-slate-200 text-[11px]">
+      <div className="flex items-center gap-1.5 min-w-0 pr-1">
+        {isPdf ? (
+          <FileText size={14} className="text-rose-600 shrink-0" />
+        ) : isExcel ? (
+          <FileSpreadsheet size={14} className="text-emerald-600 shrink-0" />
+        ) : isWord ? (
+          <FileText size={14} className="text-sky-600 shrink-0" />
+        ) : (
+          <FileIcon size={14} className="text-slate-500 shrink-0" />
+        )}
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-800 truncate" title={file.name}>
+            {file.name}
+          </p>
+          <span className="text-[9px] text-slate-400">{formatSize(file.size)}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {isPdf && (
+          <button
+            type="button"
+            onClick={handlePreview}
+            className="p-1 rounded text-slate-500 hover:text-primary hover:bg-slate-100 transition cursor-pointer"
+            title="Lihat PDF"
+          >
+            <Eye size={12} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="p-1 rounded text-slate-400 hover:text-destructive hover:bg-slate-100 transition cursor-pointer"
+          title="Hapus berkas"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 interface InputFormClientProps {
   pegawaiList: Pegawai[]
@@ -59,6 +174,8 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
     provider: 'gemini',
   })
   const formRef = useRef<HTMLFormElement>(null)
+  const fileDokInputRef = useRef<HTMLInputElement>(null)
+  const fileMatInputRef = useRef<HTMLInputElement>(null)
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B'
@@ -69,11 +186,23 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   }
 
   const removeDocFile = (index: number) => {
-    setDocFiles((prev) => prev.filter((_, i) => i !== index))
+    setDocFiles((prev) => {
+      const updated = prev.filter((_, i) => i !== index)
+      if (updated.length === 0 && fileDokInputRef.current) {
+        fileDokInputRef.current.value = ''
+      }
+      return updated
+    })
   }
 
   const removeMatFile = (index: number) => {
-    setMatFiles((prev) => prev.filter((_, i) => i !== index))
+    setMatFiles((prev) => {
+      const updated = prev.filter((_, i) => i !== index)
+      if (updated.length === 0 && fileMatInputRef.current) {
+        fileMatInputRef.current.value = ''
+      }
+      return updated
+    })
   }
 
   const bidangOptions = [...new Set(pegawaiList.map((p) => p.bidang).filter(Boolean))]
@@ -600,6 +729,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     )}
                   </div>
                   <input
+                    ref={fileDokInputRef}
                     multiple
                     type="file"
                     name="file_dok"
@@ -608,8 +738,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
                         const files = Array.from(e.target.files)
-                        setDocFiles((prev) => [...prev, ...files])
-                        e.target.value = ''
+                        setDocFiles(files)
                       }
                     }}
                     className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover cursor-pointer border border-dashed border-sky-200 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
@@ -622,50 +751,22 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                 {/* Photo Previews Grid */}
                 {docFiles.length > 0 && (
                   <div className="grid grid-cols-3 gap-1.5 mt-2 max-h-36 overflow-y-auto p-1 bg-white/70 rounded-lg border border-sky-100">
-                    {docFiles.map((file, idx) => {
-                      const objectUrl = URL.createObjectURL(file)
-                      return (
-                        <div
-                          key={`${file.name}-${idx}`}
-                          className="group relative aspect-square rounded-md overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={objectUrl}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFilePreview({
-                                  isOpen: true,
-                                  fileUrl: objectUrl,
-                                  fileName: file.name,
-                                  fileType: 'image',
-                                })
-                              }
-                              className="p-1 rounded bg-white/90 text-slate-800 hover:text-primary transition cursor-pointer"
-                              title="Lihat foto besar"
-                            >
-                              <Eye size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeDocFile(idx)}
-                              className="p-1 rounded bg-white/90 text-rose-600 hover:text-rose-700 transition cursor-pointer"
-                              title="Hapus foto ini"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                          <span className="absolute bottom-0.5 left-0.5 text-[8px] bg-slate-900/70 text-white px-1 rounded truncate max-w-[90%]">
-                            {formatFileSize(file.size)}
-                          </span>
-                        </div>
-                      )
-                    })}
+                    {docFiles.map((file, idx) => (
+                      <PhotoThumbnail
+                        key={`${file.name}-${idx}`}
+                        file={file}
+                        onRemove={() => removeDocFile(idx)}
+                        onPreview={(url) =>
+                          setFilePreview({
+                            isOpen: true,
+                            fileUrl: url,
+                            fileName: file.name,
+                            fileType: 'image',
+                          })
+                        }
+                        formatSize={formatFileSize}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -688,7 +789,10 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                         </span>
                         <button
                           type="button"
-                          onClick={() => setMatFiles([])}
+                          onClick={() => {
+                            setMatFiles([])
+                            if (fileMatInputRef.current) fileMatInputRef.current.value = ''
+                          }}
                           className="text-[10px] text-slate-400 hover:text-destructive transition cursor-pointer"
                           title="Hapus semua berkas materi"
                         >
@@ -698,6 +802,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     )}
                   </div>
                   <input
+                    ref={fileMatInputRef}
                     multiple
                     type="file"
                     name="file_materi"
@@ -706,8 +811,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
                         const files = Array.from(e.target.files)
-                        setMatFiles((prev) => [...prev, ...files])
-                        e.target.value = ''
+                        setMatFiles(files)
                       }
                     }}
                     className="w-full text-[11px] text-slate-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer border border-dashed border-slate-300 rounded-lg p-1 bg-white outline-none focus:ring-2 focus:ring-primary"
@@ -720,66 +824,22 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                 {/* Material Files Preview List */}
                 {matFiles.length > 0 && (
                   <div className="space-y-1.5 mt-2 max-h-36 overflow-y-auto p-1 bg-white/70 rounded-lg border border-slate-200">
-                    {matFiles.map((file, idx) => {
-                      const isPdf = file.name.toLowerCase().endsWith('.pdf')
-                      const isExcel = /\.(xls|xlsx)$/i.test(file.name)
-                      const isWord = /\.(doc|docx)$/i.test(file.name)
-                      const objectUrl = isPdf ? URL.createObjectURL(file) : null
-
-                      return (
-                        <div
-                          key={`${file.name}-${idx}`}
-                          className="flex items-center justify-between p-1.5 bg-white rounded-md border border-slate-200 text-[11px]"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                            {isPdf ? (
-                              <FileText size={14} className="text-rose-600 shrink-0" />
-                            ) : isExcel ? (
-                              <FileSpreadsheet size={14} className="text-emerald-600 shrink-0" />
-                            ) : isWord ? (
-                              <FileText size={14} className="text-sky-600 shrink-0" />
-                            ) : (
-                              <FileIcon size={14} className="text-slate-500 shrink-0" />
-                            )}
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800 truncate" title={file.name}>
-                                {file.name}
-                              </p>
-                              <span className="text-[9px] text-slate-400">
-                                {formatFileSize(file.size)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {isPdf && objectUrl && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setFilePreview({
-                                    isOpen: true,
-                                    fileUrl: objectUrl,
-                                    fileName: file.name,
-                                    fileType: 'pdf',
-                                  })
-                                }
-                                className="p-1 rounded text-slate-500 hover:text-primary hover:bg-slate-100 transition cursor-pointer"
-                                title="Lihat PDF"
-                              >
-                                <Eye size={12} />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeMatFile(idx)}
-                              className="p-1 rounded text-slate-400 hover:text-destructive hover:bg-slate-100 transition cursor-pointer"
-                              title="Hapus berkas"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {matFiles.map((file, idx) => (
+                      <MaterialItem
+                        key={`${file.name}-${idx}`}
+                        file={file}
+                        onRemove={() => removeMatFile(idx)}
+                        onPreview={(url) =>
+                          setFilePreview({
+                            isOpen: true,
+                            fileUrl: url,
+                            fileName: file.name,
+                            fileType: 'pdf',
+                          })
+                        }
+                        formatSize={formatFileSize}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
