@@ -104,3 +104,13 @@ describe('getDashboardStats', () => {
     expect(stats.totalDievaluasi).toBe(0)
   })
 })
+
+describe('normalizePersonName', () => {
+  it('normalizes names by stripping gelar and symbols', async () => {
+    const { normalizePersonName } = await import('@/lib/appscript')
+    expect(normalizePersonName("Nilna Qurrotaa'Yun, A.Md")).toBe('nilnaqurrotaayun')
+    expect(normalizePersonName("NILNA QURROTAA'YUN")).toBe('nilnaqurrotaayun')
+    expect(normalizePersonName("NILNA QURROTAA'YUN, A.Md")).toBe('nilnaqurrotaayun')
+    expect(normalizePersonName('Pramutedy Sukoco, S.E., M.Si., CGRS')).toBe('pramutedysukoco')
+  })
+})

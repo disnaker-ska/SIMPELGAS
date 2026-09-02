@@ -15,6 +15,7 @@ import {
   fetchLaporanFromAppsScript,
   submitLaporanToAppsScript,
   updateEvaluasiInAppsScript,
+  normalizePersonName,
   type AppsScriptFilePayload,
 } from './appscript'
 
@@ -34,7 +35,30 @@ export async function getLaporan(namaPegawai?: string): Promise<Laporan[]> {
 
 export async function getAllLaporan(): Promise<Laporan[]> {
   noStore()
-  return fetchLaporanFromAppsScript()
+  const [laporanList, pegawaiList] = await Promise.all([
+    fetchLaporanFromAppsScript(),
+    fetchPegawaiFromAppsScript(),
+  ])
+
+  // Sinkronkan data laporan dengan master pegawai (enrichment)
+  return laporanList.map((lap) => {
+    const rawName = lap.pegawai_id || lap.pegawai?.nama || ''
+    const norm = normalizePersonName(rawName)
+    const matched = pegawaiList.find((p) => {
+      if (p.id === rawName || p.nip === rawName) return true
+      return normalizePersonName(p.nama) === norm
+    })
+
+    if (matched) {
+      return {
+        ...lap,
+        bidang: lap.bidang || matched.bidang,
+        jabatan: lap.jabatan || matched.jabatan,
+        pegawai: matched,
+      }
+    }
+    return lap
+  })
 }
 
 export async function getDashboardStats(laporanData: Laporan[]): Promise<DashboardStats> {
@@ -55,10 +79,35 @@ export async function getDashboardStats(laporanData: Laporan[]): Promise<Dashboa
   }
 }
 
-export async function getLaporanByPegawaiId(pegawaiId: string): Promise<Laporan[]> {
+export async function getLaporanByPegawaiId(pegawaiIdOrName: string): Promise<Laporan[]> {
   noStore()
-  const all = await fetchLaporanFromAppsScript()
-  return all.filter((l) => l.pegawai_id === pegawaiId || l.pegawai?.nama === pegawaiId)
+  const [allLaporan, pegawaiList] = await Promise.all([
+    getAllLaporan(),
+    fetchPegawaiFromAppsScript(),
+  ])
+
+  const targetPegawai = pegawaiList.find(
+    (p) =>
+      p.id === pegawaiIdOrName ||
+      p.nip === pegawaiIdOrName ||
+      p.nama === pegawaiIdOrName ||
+      normalizePersonName(p.nama) === normalizePersonName(pegawaiIdOrName)
+  )
+
+  const targetNorm = targetPegawai
+    ? normalizePersonName(targetPegawai.nama)
+    : normalizePersonName(pegawaiIdOrName)
+
+  return allLaporan.filter((l) => {
+    if (targetPegawai) {
+      if (l.pegawai?.id === targetPegawai.id) return true
+      if (l.pegawai?.nip && l.pegawai.nip === targetPegawai.nip) return true
+    }
+    if (l.pegawai_id === pegawaiIdOrName) return true
+    const repName = l.pegawai?.nama || l.pegawai_id
+    if (targetNorm && normalizePersonName(repName) === targetNorm) return true
+    return false
+  })
 }
 
 // ============================================================

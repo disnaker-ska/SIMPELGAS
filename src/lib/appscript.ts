@@ -33,6 +33,14 @@ export function parseSheetDate(dateStr?: string): string {
 }
 
 /**
+ * Normalisasi nama pegawai untuk pencocokan toleran (case-insensitive, abaikan gelar dan tanda baca)
+ */
+export function normalizePersonName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return ''
+  return name.split(',')[0].toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+}
+
+/**
  * Mapping data mentah baris DATA_PEGAWAI ke interface Pegawai
  */
 export function mapPegawaiData(item: Record<string, any>, index: number): Pegawai {
