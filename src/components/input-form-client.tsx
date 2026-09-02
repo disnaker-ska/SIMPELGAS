@@ -394,7 +394,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
       const selectedPeg = filteredPegawai.find((p) => p.id === rawData.pegawai_id)
 
       const formPayload = {
-        pegawai_id: rawData.pegawai_id as string,
+        pegawai_id: selectedPeg?.nama || (rawData.pegawai_id as string),
         bidang: rawData.bidang as string,
         jabatan: selectedPeg?.jabatan || '',
         jenis_penugasan: rawData.jenis as string,

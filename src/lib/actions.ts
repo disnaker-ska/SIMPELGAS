@@ -152,7 +152,21 @@ export async function submitLaporan(
     }))
 
   // Temukan nama pegawai dari id / nama
-  const namaPegawai = formData.pegawai_id
+  let namaPegawai = formData.pegawai_id
+  try {
+    const pegawaiList = await getPegawai()
+    const matched = pegawaiList.find(
+      (p) =>
+        p.id === formData.pegawai_id ||
+        p.nip === formData.pegawai_id ||
+        p.nama.toLowerCase().trim() === formData.pegawai_id.toLowerCase().trim()
+    )
+    if (matched && matched.nama) {
+      namaPegawai = matched.nama
+    }
+  } catch {
+    // fallback tetap menggunakan formData.pegawai_id
+  }
 
   const res = await submitLaporanToAppsScript({
     namaPegawai,
