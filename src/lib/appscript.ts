@@ -9,6 +9,7 @@ export interface AppsScriptFilePayload {
 export interface AppsScriptSubmitPayload {
   namaPegawai: string
   bidang: string
+  jabatan?: string | null
   jenisPenugasan: string
   tanggalKegiatan: string // YYYY-MM-DD
   namaKegiatan: string

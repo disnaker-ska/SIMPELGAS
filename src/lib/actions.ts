@@ -93,6 +93,7 @@ export async function submitLaporan(
   const res = await submitLaporanToAppsScript({
     namaPegawai,
     bidang: formData.bidang,
+    jabatan: formData.jabatan,
     jenisPenugasan: formData.jenis_penugasan,
     tanggalKegiatan: formData.tanggal_kegiatan,
     namaKegiatan: formData.nama_kegiatan,
