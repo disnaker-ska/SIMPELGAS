@@ -25,27 +25,6 @@ export function getDriveDirectImageUrl(url: string, width = 800): string | null 
 }
 
 /**
- * Mengonversi URL gambar menjadi Base64 Data URL di browser
- * agar dokumen iframe bersifat self-contained tanpa delay saat window.print()
- */
-export async function convertImageUrlToBase64(url: string): Promise<string> {
-  try {
-    const res = await fetch(url, { mode: 'cors' })
-    if (!res.ok) throw new Error(`HTTP error: ${res.status}`)
-    const blob = await res.blob()
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(url)
-      reader.readAsDataURL(blob)
-    })
-  } catch (e) {
-    console.warn('Gagal memuat gambar ke Base64, fallback ke URL langsung:', e)
-    return url
-  }
-}
-
-/**
  * Merapikan teks inputan manual (numbered list, bullet list, paragraf)
  * menjadi HTML terstruktur yang padat dan rapi untuk cetak kedinasan
  */

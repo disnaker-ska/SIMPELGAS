@@ -18,7 +18,7 @@ import {
   normalizePersonName,
   type AppsScriptFilePayload,
 } from './appscript'
-import { getDriveFileId } from './print-utils'
+import { getDriveDirectImageUrl } from './print-utils'
 
 // ============================================================
 // DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET)
@@ -285,8 +285,8 @@ export async function getPimpinanSession(): Promise<{
 export async function getDirectImageBase64(url: string): Promise<string | null> {
   if (!url) return null
   if (url.startsWith('data:image/')) return url
-  const id = getDriveFileId(url)
-  const fetchUrl = id ? `https://lh3.googleusercontent.com/d/${id}=w800` : url
+  const fetchUrl = getDriveDirectImageUrl(url, 800)
+  if (!fetchUrl) return null
 
   try {
     const res = await fetch(fetchUrl, {
