@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { ClipboardList, Send, Loader2, Sparkles, Camera, FileText, Users, UtensilsCrossed } from 'lucide-react'
 import Swal from 'sweetalert2'
-import { submitKegiatanInternal, uploadFiles } from '@/lib/actions'
+import { submitKegiatanInternal } from '@/lib/actions'
 import type { Pegawai } from '@/lib/types'
 
 interface MonitoringInternalClientProps {
@@ -115,8 +115,7 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
         processFiles('file_foto_jamuan', true),
       ])
 
-      const uploadBatch = async (bucket: string, payload: typeof daftarHadirPayload) =>
-        payload.length > 0 ? await uploadFiles(bucket, payload) : []
+      const uploadBatch = async (_bucket: string, _payload: typeof daftarHadirPayload): Promise<string[]> => []
 
       const [daftarHadirUrls, undanganUrls, fotoUrls, notulenUrls, jamuanUrls] = await Promise.all([
         uploadBatch('spj-internal', daftarHadirPayload),

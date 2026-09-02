@@ -148,52 +148,14 @@ export async function updateEvaluasiPimpinan(
 // STUBS FILE UPLOAD (LEGACY SUPABASE REPLACEMENT)
 // ============================================================
 
-export async function uploadFile(
-  _bucket: string,
-  _fileName: string,
-  _fileBase64: string,
-  _mimeType: string
-): Promise<string | null> {
-  return null
-}
-
-export async function uploadFiles(
-  _bucket: string,
-  _files: Array<{ base64: string; name: string; mime: string }>
-): Promise<string[]> {
-  return []
-}
-
 // ============================================================
 // STUBS KEGIATAN INTERNAL (NON-ACTIVE)
 // ============================================================
 
-export async function submitKegiatanInternal(
-  _formData: KegiatanInternalFormData,
-  _daftarHadirUrls: string[],
-  _undanganUrls: string[],
-  _fotoKegiatanUrls: string[],
-  _notulenUrls: string[],
-  _fotoJamuanUrls: string[]
-) {
-  return { status: 'success', message: 'Fitur monitoring internal dinonaktifkan.' }
-}
-
-export async function getAllKegiatanInternal(): Promise<KegiatanInternal[]> {
-  return []
-}
-
-export async function getKegiatanInternalById(_id: string): Promise<KegiatanInternal | null> {
-  return null
-}
-
-export async function updateEvaluasiKegiatanInternal(
-  _kegiatanId: string,
-  _catatanBaru: string,
-  _roleName: string
-) {
-  return { status: 'success' }
-}
+export async function submitKegiatanInternal(..._args: any[]): Promise<{ status: string; message?: string }> { return { status: 'success' } }
+export async function getAllKegiatanInternal(): Promise<KegiatanInternal[]> { return [] }
+export async function getKegiatanInternalById(_id: string): Promise<KegiatanInternal | null> { return null }
+export async function updateEvaluasiKegiatanInternal(..._args: any[]) { return { status: 'success' } }
 
 // ============================================================
 // PIMPINAN AUTHENTICATION (SERVER SIDE + COOKIES)

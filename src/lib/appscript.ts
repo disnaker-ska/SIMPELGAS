@@ -27,23 +27,9 @@ export interface AppsScriptSubmitPayload {
 export function parseSheetDate(dateStr?: string): string {
   if (!dateStr || typeof dateStr !== 'string') return ''
   const trimmed = dateStr.trim()
-  if (!trimmed) return ''
-
-  // Format DD/MM/YYYY atau D/M/YYYY
   const parts = trimmed.split('/')
-  if (parts.length === 3) {
-    const day = parts[0].padStart(2, '0')
-    const month = parts[1].padStart(2, '0')
-    const year = parts[2]
-    return `${year}-${month}-${day}`
-  }
-
-  // Jika sudah berformat YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-    return trimmed.substring(0, 10)
-  }
-
-  return trimmed
+  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+  return /^\d{4}-\d{2}-\d{2}/.test(trimmed) ? trimmed.substring(0, 10) : trimmed
 }
 
 /**
@@ -225,8 +211,7 @@ export async function submitLaporanToAppsScript(
       redirect: 'follow',
     })
 
-    const json = await res.json()
-    return json
+    return res.json()
   } catch (error: any) {
     console.error('[APPSCRIPT] Error submitting laporan to Apps Script:', error)
     return {
@@ -263,8 +248,7 @@ export async function updateEvaluasiInAppsScript(
       cache: 'no-store',
     })
 
-    const json = await res.json()
-    return json
+    return res.json()
   } catch (error: any) {
     console.error('[APPSCRIPT] Error updating evaluasi pimpinan:', error)
     return {
