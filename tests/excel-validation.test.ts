@@ -44,4 +44,32 @@ describe('Validasi Data Riil dari Excel', () => {
     expect(driveIdMatch).toBeTruthy()
     expect(driveIdMatch![1].length).toBeGreaterThanOrEqual(10)
   })
+
+  it('memvalidasi semua URL lampiran dokumentasi riil dapat diekstrak ke direct image URL lh3', async () => {
+    const { getDriveDirectImageUrl } = await import('@/lib/print-utils')
+    const sheetLaporan = wb.Sheets['REKAP_LAPORAN']
+    const rawLaporan = XLSX.utils.sheet_to_json(sheetLaporan)
+    const mapped = rawLaporan.map((row: any, i) => mapLaporanData({ ...row, Row_Index: i + 2 }))
+
+    const laporanDenganLampiran = mapped.filter((l) => l.dokumentasi_urls && l.dokumentasi_urls.length > 0)
+    expect(laporanDenganLampiran.length).toBeGreaterThan(0)
+
+    let totalImages = 0
+    let successfulDirectUrls = 0
+
+    laporanDenganLampiran.forEach((lap) => {
+      lap.dokumentasi_urls?.forEach((url) => {
+        totalImages++
+        const direct = getDriveDirectImageUrl(url, 800)
+        if (direct && direct.includes('lh3.googleusercontent.com/d/')) {
+          successfulDirectUrls++
+        }
+      })
+    })
+
+    expect(totalImages).toBeGreaterThan(0)
+    // Seluruh gambar Google Drive di sheet harus sukses dikonversi ke lh3 direct URL
+    expect(successfulDirectUrls).toBe(totalImages)
+  })
 })
+
