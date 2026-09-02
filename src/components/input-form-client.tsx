@@ -148,7 +148,15 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   })
 
   const enhanceTextWithAI = async () => {
-    if (!catatanText.trim()) return
+    if (!catatanText.trim()) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Catatan Masih Kosong',
+        text: 'Silakan ketik atau gunakan Dikte Suara pada catatan kegiatan terlebih dahulu sebelum memoles dengan AI.',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+      })
+      return
+    }
     setIsEnhancing(true)
 
     try {
@@ -499,7 +507,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                   <button
                     type="button"
                     onClick={enhanceTextWithAI}
-                    disabled={isEnhancing || !catatanText.trim() || isSubmitting || isListening}
+                    disabled={isEnhancing || isSubmitting || isListening}
                     className="flex items-center justify-center gap-1 px-2.5 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer active:scale-95 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Perbaiki dan kembangkan poin kegiatan dengan AI"
                   >

@@ -19,8 +19,9 @@ function cleanMarkdown(text: string): string {
     .trim()
 }
 
-async function callGemini(text: string, apiKey: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+async function callGemini(text: string, apiKey: string, model?: string): Promise<string> {
+  const targetModel = model || process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

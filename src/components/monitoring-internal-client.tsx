@@ -130,7 +130,15 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
   })
 
   const enhanceTextWithAI = async () => {
-    if (!hasilText.trim()) return
+    if (!hasilText.trim()) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Hasil Kegiatan Masih Kosong',
+        text: 'Silakan ketik atau gunakan Dikte Suara pada hasil kegiatan terlebih dahulu sebelum memoles dengan AI.',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+      })
+      return
+    }
     setIsEnhancing(true)
     try {
       const res = await fetch('/api/enhance', {
@@ -360,7 +368,7 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
                 <button
                   type="button"
                   onClick={enhanceTextWithAI}
-                  disabled={isEnhancing || !hasilText.trim() || isSubmitting || isListening}
+                  disabled={isEnhancing || isSubmitting || isListening}
                   className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:from-violet-600 hover:to-indigo-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center cursor-pointer"
                 >
                   {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Perbaiki Teks dengan AI
