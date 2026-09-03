@@ -97,4 +97,57 @@ describe('SpeechToTextController & Logic', () => {
     expect(onError).toHaveBeenCalledWith('not-allowed')
     expect(controller.isListening()).toBe(false)
   })
+
+  it('7. Emits onInterim callback for interim results and resets on final', () => {
+    const onInterim = vi.fn()
+    const onTranscript = vi.fn()
+    const controller = new SpeechToTextController({ onInterim, onTranscript })
+    controller.start()
+
+    // 1. Interim event
+    const interimEvent = {
+      resultIndex: 0,
+      results: [
+        Object.assign([{ transcript: 'aku mengha' }], { isFinal: false }),
+      ],
+    }
+    mockRecognitionInstance.onresult(interimEvent)
+    expect(onInterim).toHaveBeenCalledWith('aku mengha')
+    expect(onTranscript).toHaveBeenCalledWith('aku mengha', false)
+
+    // 2. Final event
+    const finalEvent = {
+      resultIndex: 0,
+      results: [
+        Object.assign([{ transcript: 'aku menghadiri rapat' }], { isFinal: true }),
+      ],
+    }
+    mockRecognitionInstance.onresult(finalEvent)
+    expect(onInterim).toHaveBeenCalledWith('')
+    expect(onTranscript).toHaveBeenCalledWith('aku menghadiri rapat', true)
+  })
+
+  it('8. Auto-restarts when onend fires unexpectedly while desiredListening is true', () => {
+    vi.useFakeTimers()
+    const controller = new SpeechToTextController()
+    controller.start()
+    expect(mockRecognitionInstance.start).toHaveBeenCalledTimes(1)
+
+    // Simulate unexpected silent onend from browser
+    mockRecognitionInstance.onend()
+    vi.advanceTimersByTime(200)
+
+    // Should auto-restart
+    expect(mockRecognitionInstance.start).toHaveBeenCalledTimes(2)
+    expect(controller.isListening()).toBe(true)
+
+    // Explicit stop should prevent further restarts
+    controller.stop()
+    mockRecognitionInstance.onend()
+    vi.advanceTimersByTime(200)
+
+    expect(mockRecognitionInstance.start).toHaveBeenCalledTimes(2)
+    expect(controller.isListening()).toBe(false)
+    vi.useRealTimers()
+  })
 })
