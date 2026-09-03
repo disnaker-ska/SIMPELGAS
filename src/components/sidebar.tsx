@@ -103,6 +103,7 @@ export function Sidebar() {
             <div className="pt-6 mt-6 border-t border-slate-800">
               <Link
                 href="/pimpinan"
+                prefetch={false}
                 onClick={() => setShowMobile(false)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 ease-out cursor-pointer active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-secondary shadow-md ${
                   pathname === '/pimpinan'
