@@ -55,48 +55,48 @@ export function buildLaporanHTML(
 
       <!-- Tabel Metadata -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11pt;">
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="width: 26%; padding: 2.5px 0; vertical-align: top;">Nama Pegawai</td>
           <td style="width: 2%; padding: 2.5px 0; text-align: center; vertical-align: top;">:</td>
           <td style="width: 72%; padding: 2.5px 0; vertical-align: top;"><strong>${pegawaiNama}</strong></td>
         </tr>
-        ${nipText ? `<tr><td style="padding: 2.5px 0; vertical-align: top;">NIP</td><td style="text-align: center; vertical-align: top;">:</td><td style="padding: 2.5px 0; vertical-align: top;">${nipText}</td></tr>` : ''}
-        <tr>
+        ${nipText ? `<tr data-pdf-avoid-break="true"><td style="padding: 2.5px 0; vertical-align: top;">NIP</td><td style="text-align: center; vertical-align: top;">:</td><td style="padding: 2.5px 0; vertical-align: top;">${nipText}</td></tr>` : ''}
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Jabatan</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${jabatanText}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Bidang / Unit Kerja</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${bidangText}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Jenis Penugasan</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${lap.jenis_penugasan || '-'}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Hari / Tanggal</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${tanggal}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Nama Kegiatan</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${lap.nama_kegiatan || '-'}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Tempat Kegiatan</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${lap.tempat_kegiatan || '-'}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Penyelenggara</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${lap.penyelenggara || '-'}</td>
         </tr>
-        <tr>
+        <tr data-pdf-avoid-break="true">
           <td style="padding: 2.5px 0; vertical-align: top;">Tamu Undangan / Peserta</td>
           <td style="text-align: center; vertical-align: top;">:</td>
           <td style="padding: 2.5px 0; vertical-align: top;">${lap.tamu_undangan || '-'}</td>
@@ -104,7 +104,7 @@ export function buildLaporanHTML(
       </table>
 
       <!-- Catatan Hasil Kegiatan -->
-      <div style="margin-top: 14px; page-break-inside: avoid;">
+      <div data-pdf-avoid-break="true" class="catatan-hasil-section" style="margin-top: 14px; page-break-inside: avoid;">
         <span style="font-weight: bold; margin-bottom: 4px; display: block;">Catatan Hasil Kegiatan:</span>
         <div style="text-align: justify; text-justify: inter-word; font-size: 10.5pt; line-height: 1.4; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fafafa;">
           ${formatRichTextForPrint(lap.catatan_hasil)}
@@ -115,7 +115,7 @@ export function buildLaporanHTML(
       ${
         lap.catatan_pimpinan
           ? `
-        <div style="margin-top: 14px; border: 1.5px solid #333; padding: 8px 12px; border-radius: 4px; background: #fdfdfd; page-break-inside: avoid;">
+        <div data-pdf-avoid-break="true" class="catatan-pimpinan-section" style="margin-top: 14px; border: 1.5px solid #333; padding: 8px 12px; border-radius: 4px; background: #fdfdfd; page-break-inside: avoid;">
           <span style="font-weight: bold; margin-bottom: 4px; display: block; color: #111;">Arahan / Disposisi Pimpinan:</span>
           <div style="font-size: 10pt; line-height: 1.35; font-style: italic;">
             ${formatRichTextForPrint(lap.catatan_pimpinan)}
@@ -129,13 +129,13 @@ export function buildLaporanHTML(
       ${
         base64Images.length > 0
           ? `
-        <div style="margin-top: 16px; page-break-inside: avoid;">
+        <div data-pdf-avoid-break="true" class="doc-section" style="margin-top: 16px; page-break-inside: avoid;">
           <span style="font-weight: bold; margin-bottom: 4px; display: block;">Dokumentasi Kegiatan:</span>
           <div style="display: grid; grid-template-columns: ${base64Images.length === 1 ? '1fr' : 'repeat(2, 1fr)'}; gap: 14px; margin-top: 6px;">
             ${base64Images
               .map(
                 (img, idx) => `
-              <div style="border: 1px solid #888; border-radius: 4px; padding: 5px; background: #fff; text-align: center; page-break-inside: avoid;">
+              <div data-pdf-avoid-break="true" class="doc-item" style="border: 1px solid #888; border-radius: 4px; padding: 5px; background: #fff; text-align: center; page-break-inside: avoid;">
                 ${
                   img.isDoc
                     ? `<div style="height: 220px; display:flex; align-items:center; justify-content:center; background:#eee; font-size:10pt; color:#666;">Berkas Foto ${idx + 1}</div>`
@@ -156,7 +156,7 @@ export function buildLaporanHTML(
       ${
         lap.materi_urls && lap.materi_urls.length > 0
           ? `
-        <div style="margin-top: 14px; page-break-inside: avoid;">
+        <div data-pdf-avoid-break="true" class="materi-section" style="margin-top: 14px; page-break-inside: avoid;">
           <span style="font-weight: bold; margin-bottom: 4px; display: block;">Materi Paparan / Lampiran Berkas:</span>
           <ul style="margin-top: 4px; padding-left: 20px; font-size: 9.5pt;">
             ${lap.materi_urls
@@ -173,7 +173,7 @@ export function buildLaporanHTML(
       }
 
       <!-- Tanda Tangan -->
-      <div style="margin-top: 25px; page-break-inside: avoid; display: flex; justify-content: flex-end;">
+      <div data-pdf-avoid-break="true" class="signature-container" style="margin-top: 25px; page-break-inside: avoid; display: flex; justify-content: flex-end;">
         <div style="width: 260px; text-align: center;">
           <p style="margin-bottom: 55px;">
             Surakarta, ${new Date().toLocaleDateString('id-ID', {

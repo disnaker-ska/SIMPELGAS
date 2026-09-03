@@ -56,6 +56,16 @@ describe('PDF Generator Helpers (TDD)', () => {
     expect(html).toContain('Pegawai yang Melaporkan,')
   })
 
+  it('annotates critical sections with data-pdf-avoid-break in buildLaporanHTML', () => {
+    const html = buildLaporanHTML(mockLaporan, mockPegawai, 'data:image/png;base64,mockLogo', [
+      { src: 'data:image/jpeg;base64,mockImg', isDoc: false },
+    ])
+
+    expect(html).toContain('data-pdf-avoid-break')
+    expect(html).toMatch(/<div[^>]*data-pdf-avoid-break[^>]*class="doc-item"/)
+    expect(html).toMatch(/<div[^>]*data-pdf-avoid-break[^>]*class="signature-container"/)
+  })
+
   it('renders container at origin (0, 0) and exports PDF cleanly without negative offset', async () => {
     let capturedLeft = ''
     let capturedTop = ''
