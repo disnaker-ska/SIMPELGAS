@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   FileEdit,
-  Printer,
+  FileDown,
   KeyRound,
   Building2,
   Menu,
@@ -16,7 +16,7 @@ import {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/input', label: 'Input Penugasan', icon: FileEdit },
-  { href: '/cetak', label: 'Cetak', icon: Printer },
+  { href: '/cetak', label: 'Download PDF', icon: FileDown },
 ]
 
 export function Sidebar() {

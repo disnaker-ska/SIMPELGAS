@@ -20,7 +20,7 @@ import {
   BarChart3,
   FileSpreadsheet,
   ArrowRight,
-  Printer,
+  FileDown,
   Sparkles,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -620,7 +620,7 @@ export function DashboardClient({
             href="/cetak"
             className="text-xs font-bold text-sky-700 hover:text-sky-800 flex items-center gap-1 transition"
           >
-            <span>Buka Semua di Menu Cetak</span>
+            <span>Buka Semua di Menu Download PDF</span>
             <ArrowRight size={14} />
           </Link>
         </div>
@@ -692,8 +692,8 @@ export function DashboardClient({
                       href="/cetak"
                       className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition flex items-center gap-1"
                     >
-                      <Printer size={12} className="text-primary" />
-                      <span>Cetak</span>
+                      <FileDown size={12} className="text-primary" />
+                      <span>Unduh PDF</span>
                     </Link>
                   </div>
                 </div>
@@ -708,8 +708,8 @@ export function DashboardClient({
             href="/cetak"
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 hover:text-sky-800 px-4 py-2.5 rounded-xl bg-white border-2 border-slate-300 hover:border-sky-500 shadow-xs hover:shadow-sm transition active:scale-98 cursor-pointer"
           >
-            <Printer size={15} />
-            <span>Kelola &amp; Cetak Seluruh Laporan ({filteredData.length} Data)</span>
+            <FileDown size={15} />
+            <span>Kelola &amp; Unduh Seluruh Laporan ({filteredData.length} Data)</span>
             <ArrowRight size={14} />
           </Link>
         </div>
