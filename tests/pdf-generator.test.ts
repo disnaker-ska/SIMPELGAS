@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { sanitizeFilename, buildLaporanHTML } from '@/lib/pdf-generator'
+import { sanitizeFilename, buildLaporanHTML, calculateSmartPageBreaks } from '@/lib/pdf-generator'
 import type { Laporan, Pegawai } from '@/lib/types'
 
 const mockPegawai: Pegawai = {
@@ -64,6 +64,38 @@ describe('PDF Generator Helpers (TDD)', () => {
     expect(html).toContain('data-pdf-avoid-break')
     expect(html).toMatch(/<div[^>]*data-pdf-avoid-break[^>]*class="doc-item"/)
     expect(html).toMatch(/<div[^>]*data-pdf-avoid-break[^>]*class="signature-container"/)
+  })
+
+  it('calculates smart page breaks without cutting through avoid-break elements', () => {
+    const mockContainer = {
+      offsetWidth: 794,
+      getBoundingClientRect: () => ({ top: 100, bottom: 3100, height: 3000 }),
+      querySelectorAll: vi.fn((selector: string) => {
+        if (selector.includes('data-pdf-avoid-break')) {
+          return [
+            {
+              getBoundingClientRect: () => ({
+                top: 100 + 1000, // relative top = 1000, scaled = 2000
+                bottom: 100 + 1250, // relative bottom = 1250, scaled = 2500
+                height: 250,
+              }),
+            },
+          ]
+        }
+        return []
+      }),
+    } as any
+
+    const canvasScale = 2
+    const canvasHeight = 5000
+    const pageCanvasHeight = 2246
+
+    const slices = calculateSmartPageBreaks(mockContainer, canvasScale, canvasHeight, pageCanvasHeight)
+
+    expect(slices.length).toBeGreaterThanOrEqual(2)
+    // Page 1 should stop before 2000 so the element is not sliced at 2246
+    expect(slices[0]).toEqual({ startY: 0, height: 2000 })
+    expect(slices[1].startY).toBe(2000)
   })
 
   it('renders container at origin (0, 0) and exports PDF cleanly without negative offset', async () => {

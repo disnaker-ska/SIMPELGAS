@@ -214,6 +214,87 @@ export async function getLogoBase64(): Promise<string> {
   }
 }
 
+export interface PageSlice {
+  startY: number
+  height: number
+}
+
+/**
+ * Menghitung batas pemotongan lembar halaman A4 secara cerdas (Content-Aware).
+ * Mencegah elemen beranotasi data-pdf-avoid-break (foto, tanda tangan, baris tabel)
+ * terpotong di tengah lembar kertas dengan menggeser batas potong ke tepi atas elemen.
+ */
+export function calculateSmartPageBreaks(
+  container: HTMLElement,
+  canvasScale: number,
+  canvasHeight: number,
+  pageCanvasHeight: number
+): PageSlice[] {
+  const slices: PageSlice[] = []
+  const containerRect =
+    typeof container.getBoundingClientRect === 'function'
+      ? container.getBoundingClientRect()
+      : { top: 0, bottom: 0, height: 0, left: 0, right: 0, width: 0 }
+
+  // Ambil seluruh elemen yang tidak boleh terpotong di tengah halaman
+  const avoidElements = typeof container.querySelectorAll === 'function'
+    ? Array.from(container.querySelectorAll('[data-pdf-avoid-break]'))
+    : []
+
+  // Hitung batas vertikal masing-masing elemen dalam koordinat piksel canvas
+  const boundaries = avoidElements.map((el) => {
+    const rect =
+      typeof el.getBoundingClientRect === 'function'
+        ? el.getBoundingClientRect()
+        : { top: 0, bottom: 0, height: 0, left: 0, right: 0, width: 0 }
+    const top = (rect.top - containerRect.top) * canvasScale
+    const bottom = (rect.bottom - containerRect.top) * canvasScale
+    return {
+      top: Math.max(0, top),
+      bottom,
+      height: bottom - top,
+    }
+  })
+
+  let currentY = 0
+
+  while (currentY < canvasHeight) {
+    const remainingHeight = canvasHeight - currentY
+    if (remainingHeight <= pageCanvasHeight) {
+      slices.push({ startY: currentY, height: remainingHeight })
+      break
+    }
+
+    // Titik potong kandidat standar (1 halaman penuh dari currentY)
+    const candidateBreak = currentY + pageCanvasHeight
+
+    // Cari elemen-elemen yang terpotong di tengah oleh candidateBreak
+    const slicedElements = boundaries.filter(
+      (b) =>
+        b.top < candidateBreak &&
+        b.bottom > candidateBreak &&
+        b.top > currentY &&
+        b.height <= pageCanvasHeight
+    )
+
+    let bestBreak = candidateBreak
+    if (slicedElements.length > 0) {
+      // Ambil titik paling atas di antara elemen yang terpotong
+      const earliestTop = Math.min(...slicedElements.map((b) => b.top))
+      // Pastikan halaman tetap terisi minimal 20% sebelum digeser ke halaman berikutnya
+      if (earliestTop - currentY >= pageCanvasHeight * 0.2) {
+        bestBreak = earliestTop
+      }
+    }
+
+    const sliceHeight = bestBreak - currentY
+    slices.push({ startY: currentY, height: sliceHeight })
+    currentY = bestBreak
+  }
+
+  return slices
+}
+
 export async function generateLaporanPDF(
   lap: Laporan,
   targetPegawai?: Pegawai | null
@@ -224,39 +305,33 @@ export async function generateLaporanPDF(
   const [logoBase64, base64Images] = await Promise.all([
     getLogoBase64(),
     Promise.all(
-      (lap.dokumentasi_urls || []).map(async (url: string) => {
-        const b64 = await getDirectImageBase64(url)
-        if (b64) return { src: b64, isDoc: false }
-        return { src: url, isDoc: true }
+      (lap.dokumentasi_urls || []).map(async (url) => {
+        const directBase64 = await getDirectImageBase64(url)
+        return {
+          src: directBase64 || url,
+          isDoc: !directBase64 && !url.match(/\.(jpg|jpeg|png|webp)($|\?)/i),
+        }
       })
     ),
   ])
 
-  // 2. Buat container DOM offscreen pada koordinat origin (0, 0) di balik tampilan (z-index -9999)
+  // 2. Buat kontainer DOM di origin (0, 0) di balik layar (z-index: -9999)
   const container = document.createElement('div')
+  container.id = 'simpelgas-pdf-print-container'
   container.style.position = 'fixed'
   container.style.left = '0px'
   container.style.top = '0px'
   container.style.width = '794px'
   container.style.background = '#ffffff'
   container.style.zIndex = '-9999'
-  container.innerHTML = buildLaporanHTML(lap, targetPegawai, logoBase64, base64Images)
+  container.style.opacity = '1'
+  container.style.pointerEvents = 'none'
+
+  const htmlString = buildLaporanHTML(lap, targetPegawai, logoBase64, base64Images)
+  container.innerHTML = htmlString
   document.body.appendChild(container)
 
   try {
-    // Pastikan seluruh elemen gambar telah selesai dimuat sebelum render canvas
-    const images = Array.from(container.querySelectorAll('img'))
-    await Promise.all(
-      images.map(
-        (img) =>
-          new Promise((resolve) => {
-            if (img.complete) return resolve(true)
-            img.onload = () => resolve(true)
-            img.onerror = () => resolve(true)
-          })
-      )
-    )
-
     // 3. Render container DOM ke Canvas berkualitas tinggi (scale: 2 = 300 DPI)
     const canvas = await html2canvas(container, {
       scale: 2,
@@ -281,17 +356,24 @@ export async function generateLaporanPDF(
 
     // Hitung tinggi canvas proporsional untuk 1 halaman A4
     const pageCanvasHeight = (canvasWidth * pdfHeight) / pdfWidth
-    let renderedHeight = 0
+    const canvasScale = container.offsetWidth > 0 ? canvasWidth / container.offsetWidth : 2
 
-    while (renderedHeight < canvasHeight) {
-      if (renderedHeight > 0) {
+    // Hitung pemotongan cerdas per halaman agar elemen tidak terpotong di tengah
+    const slices = calculateSmartPageBreaks(
+      container,
+      canvasScale,
+      canvasHeight,
+      pageCanvasHeight
+    )
+
+    for (let i = 0; i < slices.length; i++) {
+      if (i > 0) {
         doc.addPage()
       }
 
-      // Potong canvas per lembar A4 secara presisi
+      const slice = slices[i]
       const pageCanvas = document.createElement('canvas')
       pageCanvas.width = canvasWidth
-      const sliceHeight = Math.min(pageCanvasHeight, canvasHeight - renderedHeight)
       pageCanvas.height = pageCanvasHeight
 
       const ctx = pageCanvas.getContext('2d')
@@ -301,20 +383,18 @@ export async function generateLaporanPDF(
         ctx.drawImage(
           canvas,
           0,
-          renderedHeight,
+          slice.startY,
           canvasWidth,
-          sliceHeight,
+          slice.height,
           0,
           0,
           canvasWidth,
-          sliceHeight
+          slice.height
         )
       }
 
       const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.95)
       doc.addImage(pageImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight)
-
-      renderedHeight += pageCanvasHeight
     }
 
     const pegawaiNama = targetPegawai?.nama || lap.pegawai?.nama || lap.pegawai_id || 'Pegawai'
