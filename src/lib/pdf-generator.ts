@@ -193,9 +193,9 @@ export function buildLaporanHTML(
 
 let cachedLogoBase64: string | null = null
 
-async function getLogoBase64(): Promise<string> {
+export async function getLogoBase64(): Promise<string> {
   if (cachedLogoBase64) return cachedLogoBase64
-  if (typeof window === 'undefined') return '/Pemkot.png'
+  if (typeof window === 'undefined' || typeof FileReader === 'undefined') return '/Pemkot.png'
 
   try {
     const res = await fetch('/Pemkot.png')
@@ -232,11 +232,11 @@ export async function generateLaporanPDF(
     ),
   ])
 
-  // 2. Buat container DOM offscreen
+  // 2. Buat container DOM offscreen pada koordinat origin (0, 0) di balik tampilan (z-index -9999)
   const container = document.createElement('div')
   container.style.position = 'fixed'
-  container.style.left = '-9999px'
-  container.style.top = '0'
+  container.style.left = '0px'
+  container.style.top = '0px'
   container.style.width = '794px'
   container.style.background = '#ffffff'
   container.style.zIndex = '-9999'
@@ -244,7 +244,7 @@ export async function generateLaporanPDF(
   document.body.appendChild(container)
 
   try {
-    // Pastikan seluruh elemen gambar telah selesai dimuat
+    // Pastikan seluruh elemen gambar telah selesai dimuat sebelum render canvas
     const images = Array.from(container.querySelectorAll('img'))
     await Promise.all(
       images.map(
@@ -257,7 +257,16 @@ export async function generateLaporanPDF(
       )
     )
 
-    // 3. Konfigurasi jsPDF
+    // 3. Render container DOM ke Canvas berkualitas tinggi (scale: 2 = 300 DPI)
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowWidth: 794,
+    })
+
+    // 4. Konversi Canvas ke Lembar PDF Resmi A4
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -265,29 +274,55 @@ export async function generateLaporanPDF(
       compress: true,
     })
 
-    // Pasang html2canvas ke window untuk compatibility fallback
-    ;(window as any).html2canvas = html2canvas
+    const pdfWidth = 210 // Lebar A4 dalam mm
+    const pdfHeight = 297 // Tinggi A4 dalam mm
+    const canvasWidth = canvas.width
+    const canvasHeight = canvas.height
+
+    // Hitung tinggi canvas proporsional untuk 1 halaman A4
+    const pageCanvasHeight = (canvasWidth * pdfHeight) / pdfWidth
+    let renderedHeight = 0
+
+    while (renderedHeight < canvasHeight) {
+      if (renderedHeight > 0) {
+        doc.addPage()
+      }
+
+      // Potong canvas per lembar A4 secara presisi
+      const pageCanvas = document.createElement('canvas')
+      pageCanvas.width = canvasWidth
+      const sliceHeight = Math.min(pageCanvasHeight, canvasHeight - renderedHeight)
+      pageCanvas.height = pageCanvasHeight
+
+      const ctx = pageCanvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+        ctx.drawImage(
+          canvas,
+          0,
+          renderedHeight,
+          canvasWidth,
+          sliceHeight,
+          0,
+          0,
+          canvasWidth,
+          sliceHeight
+        )
+      }
+
+      const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.95)
+      doc.addImage(pageImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight)
+
+      renderedHeight += pageCanvasHeight
+    }
 
     const pegawaiNama = targetPegawai?.nama || lap.pegawai?.nama || lap.pegawai_id || 'Pegawai'
     const cleanNama = sanitizeFilename(pegawaiNama)
     const tglKegiatan = lap.tanggal_kegiatan ? lap.tanggal_kegiatan.split('T')[0] : 'Kegiatan'
     const fileName = `Laporan_Penugasan_${cleanNama}_${tglKegiatan}.pdf`
 
-    await doc.html(container, {
-      callback: (pdf) => {
-        pdf.save(fileName)
-      },
-      x: 0,
-      y: 0,
-      width: 210,
-      windowWidth: 794,
-      autoPaging: 'text',
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      },
-    })
+    doc.save(fileName)
   } finally {
     if (document.body.contains(container)) {
       document.body.removeChild(container)

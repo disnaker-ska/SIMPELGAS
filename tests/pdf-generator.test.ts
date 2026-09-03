@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { sanitizeFilename, buildLaporanHTML } from '@/lib/pdf-generator'
 import type { Laporan, Pegawai } from '@/lib/types'
 
@@ -54,5 +54,103 @@ describe('PDF Generator Helpers (TDD)', () => {
     expect(html).toContain('Lanjutkan koordinasi teknis.')
     expect(html).toContain('Dokumentasi Kegiatan:')
     expect(html).toContain('Pegawai yang Melaporkan,')
+  })
+
+  it('renders container at origin (0, 0) and exports PDF cleanly without negative offset', async () => {
+    let capturedLeft = ''
+    let capturedTop = ''
+    let capturedZIndex = ''
+    let capturedFileName = ''
+    let addImageCalls = 0
+
+    // Setup browser DOM environment mock
+    const originalWindow = global.window
+    const originalDocument = global.document
+    const originalFetch = global.fetch
+
+    const createdElements: any[] = []
+    global.window = {} as any
+    global.document = {
+      createElement: vi.fn((tag: string) => {
+        const el: any = {
+          tagName: tag.toUpperCase(),
+          style: {},
+          querySelectorAll: vi.fn(() => []),
+          appendChild: vi.fn(),
+          removeChild: vi.fn(),
+          getContext: vi.fn(() => ({
+            fillStyle: '',
+            fillRect: vi.fn(),
+            drawImage: vi.fn(),
+          })),
+          toDataURL: vi.fn(() => 'data:image/jpeg;base64,mockCanvasData'),
+        }
+        createdElements.push(el)
+        return el
+      }),
+      body: {
+        appendChild: vi.fn(),
+        removeChild: vi.fn(),
+        contains: vi.fn(() => true),
+      },
+    } as any
+
+    // Mock html2canvas
+    const html2canvasMock = vi.fn(async (element: HTMLElement) => {
+      capturedLeft = element.style.left
+      capturedTop = element.style.top
+      capturedZIndex = element.style.zIndex
+
+      return {
+        width: 1588,
+        height: 2246, // exactly 1 A4 page at 2x scale
+        getContext: () => ({
+          fillStyle: '',
+          fillRect: vi.fn(),
+          drawImage: vi.fn(),
+        }),
+        toDataURL: () => 'data:image/jpeg;base64,mockImageData',
+      }
+    })
+
+    // Mock jsPDF
+    const saveMock = vi.fn((name: string) => {
+      capturedFileName = name
+    })
+    const addImageMock = vi.fn(() => {
+      addImageCalls++
+    })
+    const addPageMock = vi.fn()
+
+    class MockJsPDF {
+      save = saveMock
+      addImage = addImageMock
+      addPage = addPageMock
+    }
+
+    vi.doMock('html2canvas', () => ({ default: html2canvasMock }))
+    vi.doMock('jspdf', () => ({ jsPDF: MockJsPDF }))
+    vi.resetModules()
+
+    const { generateLaporanPDF } = await import('@/lib/pdf-generator')
+
+    // Mock window fetch for logo
+    global.fetch = vi.fn().mockResolvedValue({
+      blob: async () => new Blob(['logo'], { type: 'image/png' }),
+    } as any)
+
+    try {
+      await generateLaporanPDF(mockLaporan, mockPegawai)
+
+      expect(capturedLeft).toBe('0px')
+      expect(capturedTop).toBe('0px')
+      expect(capturedZIndex).toBe('-9999')
+      expect(capturedFileName).toBe('Laporan_Penugasan_Budi_Santoso_S_Kom_2026-09-01.pdf')
+      expect(addImageCalls).toBeGreaterThanOrEqual(1)
+    } finally {
+      global.window = originalWindow
+      global.document = originalDocument
+      global.fetch = originalFetch
+    }
   })
 })
