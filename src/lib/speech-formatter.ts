@@ -65,23 +65,6 @@ export function formatSpeechText(raw: string): string {
 }
 
 /**
- * Mengekstrak bagian selisih (delta) jika engine mengirimkan kalimat kumulatif
- */
-export function cleanCumulativeDelta(previousText: string, currentTranscript: string): string {
-  const prev = (previousText || '').trim()
-  const curr = (currentTranscript || '').trim()
-
-  if (!prev) return curr
-  if (!curr) return ''
-
-  if (curr.toLowerCase().startsWith(prev.toLowerCase())) {
-    return curr.slice(prev.length).trim()
-  }
-
-  return curr
-}
-
-/**
  * Menggabungkan teks dasar dengan chunk transkripsi baru secara cerdas tanpa duplikasi kumulatif
  */
 export function mergeTranscript(baseText: string, newChunk: string): string {

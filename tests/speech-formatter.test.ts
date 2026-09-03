@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatSpeechText,
-  cleanCumulativeDelta,
   mergeTranscript,
 } from '@/lib/speech-formatter'
 
@@ -35,18 +34,6 @@ describe('Speech Formatter & Anti-Duplication Engine', () => {
       const input = 'ini adalah poin penting mengenai nomor telepon dinas'
       const output = formatSpeechText(input)
       expect(output).toBe('Ini adalah poin penting mengenai nomor telepon dinas')
-    })
-  })
-
-  describe('cleanCumulativeDelta', () => {
-    it('6. Extracts only the delta when recognizer sends cumulative transcript', () => {
-      expect(cleanCumulativeDelta('aku', 'aku menghadiri')).toBe('menghadiri')
-      expect(cleanCumulativeDelta('aku menghadiri', 'aku menghadiri rapat')).toBe('rapat')
-      expect(cleanCumulativeDelta('aku menghadiri rapat', 'aku menghadiri rapat internal')).toBe('internal')
-    })
-
-    it('7. Returns full transcript if not a cumulative prefix', () => {
-      expect(cleanCumulativeDelta('pembahasan selesai.', 'agenda berikutnya')).toBe('agenda berikutnya')
     })
   })
 
