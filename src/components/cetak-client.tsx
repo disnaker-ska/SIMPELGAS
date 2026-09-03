@@ -5,7 +5,7 @@
 
 import { useState, useMemo } from 'react'
 import {
-  Printer,
+  FileDown,
   Search,
   Calendar,
   MapPin,
@@ -25,8 +25,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react'
 import Swal from 'sweetalert2'
-import { getDirectImageBase64 } from '@/lib/actions'
-import { formatRichTextForPrint } from '@/lib/print-utils'
+import { generateLaporanPDF } from '@/lib/pdf-generator'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
 import type { Pegawai, Laporan } from '@/lib/types'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -52,7 +51,7 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [printingId, setPrintingId] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<Laporan | null>(null)
 
   const itemsPerPage = 10
@@ -160,372 +159,40 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
     setCurrentPage(1)
   }
 
-  // Print Logic: Generate official A4 document in hidden iframe
-  const prosesCetak = async (lap: Laporan) => {
-    setPrintingId(lap.id)
+  // PDF Download Logic: Generate official A4 document directly via DOM
+  const handleDownloadPDF = async (lap: Laporan) => {
+    setDownloadingId(lap.id)
+    Swal.fire({
+      title: 'Menyiapkan Dokumen PDF...',
+      text: 'Sedang merender format resmi kedinasan dan memuat lampiran.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading()
+      },
+    })
+
     try {
-      const logoUrl = window.location.origin + '/Pemkot.png'
       const targetPegawai =
         pegawaiList.find((p) => p.id === lap.pegawai_id || p.nip === lap.pegawai_id) || lap.pegawai
-      const pegawaiNama = targetPegawai?.nama || lap.pegawai?.nama || lap.pegawai_id || '-'
-      const nipText = targetPegawai?.nip || lap.pegawai?.nip ? `NIP. ${targetPegawai?.nip || lap.pegawai?.nip}` : ''
-      const jabatanText = targetPegawai?.jabatan || lap.jabatan || 'Staff'
-      const bidangText = targetPegawai?.bidang || lap.bidang || '-'
-      const tanggal = lap.tanggal_kegiatan
-        ? new Date(lap.tanggal_kegiatan).toLocaleDateString('id-ID', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })
-        : '-'
-
-      // Preload image files to Base64 via Server Action
-      const base64Images = await Promise.all(
-        (lap.dokumentasi_urls || []).map(async (url: string) => {
-          const b64 = await getDirectImageBase64(url)
-          if (b64) return { src: b64, isDoc: false }
-          return { src: url, isDoc: true }
-        })
-      )
-
-      const oldIframe = document.getElementById('print-iframe')
-      if (oldIframe) document.body.removeChild(oldIframe)
-
-      const iframe = document.createElement('iframe')
-      iframe.style.position = 'fixed'
-      iframe.style.right = '0'
-      iframe.style.bottom = '0'
-      iframe.style.width = '210mm'
-      iframe.style.height = '297mm'
-      iframe.style.opacity = '0'
-      iframe.style.pointerEvents = 'none'
-      iframe.style.border = '0'
-      iframe.id = 'print-iframe'
-      document.body.appendChild(iframe)
-
-      const doc = iframe.contentWindow!.document
-      doc.open()
-      doc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Laporan Penugasan - ${pegawaiNama}</title>
-            <style>
-              @page {
-                size: A4 portrait;
-                margin: 15mm 20mm 15mm 20mm;
-              }
-              @media print {
-                body { margin: 0; padding: 0; }
-                .page-break { page-break-before: always; }
-                .anti-potong { page-break-inside: avoid; }
-              }
-              body {
-                font-family: 'Times New Roman', Times, serif;
-                font-size: 11pt;
-                line-height: 1.35;
-                color: #000;
-                margin: 0;
-                padding: 0;
-              }
-              .header {
-                display: flex;
-                align-items: center;
-                border-bottom: 3px double #000;
-                padding-bottom: 8px;
-                margin-bottom: 16px;
-              }
-              .header-logo {
-                width: 75px;
-                height: auto;
-              }
-              .header-text {
-                flex-grow: 1;
-                text-align: center;
-                padding: 0 10px;
-              }
-              .header-text h3 {
-                margin: 0;
-                font-size: 13pt;
-                font-weight: bold;
-                letter-spacing: 0.5px;
-              }
-              .header-text h2 {
-                margin: 2px 0;
-                font-size: 15pt;
-                font-weight: bold;
-                letter-spacing: 1px;
-              }
-              .header-text p {
-                margin: 1px 0;
-                font-size: 9pt;
-              }
-              
-              .doc-title {
-                text-align: center;
-                margin-bottom: 16px;
-              }
-              .doc-title h3 {
-                margin: 0;
-                font-size: 12pt;
-                font-weight: bold;
-                text-decoration: underline;
-                letter-spacing: 0.5px;
-              }
-              
-              .content-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 12px;
-                font-size: 11pt;
-              }
-              .content-table td {
-                padding: 2.5px 0;
-                vertical-align: top;
-              }
-              .content-table td.label {
-                width: 26%;
-              }
-              .content-table td.colon {
-                width: 2%;
-                text-align: center;
-              }
-              .content-table td.value {
-                width: 72%;
-              }
-
-              .section-heading {
-                font-weight: bold;
-                margin-top: 12px;
-                margin-bottom: 4px;
-                display: block;
-              }
-              
-              .doc-grid {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 14px;
-                margin-top: 6px;
-              }
-              .doc-grid.single-doc {
-                grid-template-columns: 1fr;
-                max-width: 92%;
-                margin: 6px auto 0 auto;
-              }
-              .doc-item {
-                border: 1px solid #888;
-                border-radius: 4px;
-                padding: 5px;
-                background: #fff;
-                page-break-inside: avoid;
-                text-align: center;
-              }
-              .doc-item img {
-                width: 100%;
-                height: 220px;
-                object-fit: cover;
-                display: block;
-                border-radius: 2px;
-              }
-              .doc-grid.single-doc .doc-item img {
-                height: 280px;
-                object-fit: cover;
-              }
-              .doc-caption {
-                font-size: 9pt;
-                color: #333;
-                margin-top: 5px;
-                font-style: italic;
-              }
-              
-              .materi-list {
-                margin-top: 4px;
-                padding-left: 20px;
-                font-size: 9.5pt;
-              }
-              .materi-list li {
-                margin-bottom: 3px;
-                word-break: break-all;
-              }
-              
-              .signature-container {
-                margin-top: 25px;
-                page-break-inside: avoid;
-                display: flex;
-                justify-content: flex-end;
-              }
-              .signature-box {
-                width: 260px;
-                text-align: center;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <img src="${logoUrl}" class="header-logo" alt="Logo Pemkot" />
-              <div class="header-text">
-                <h3>PEMERINTAH KOTA SURAKARTA</h3>
-                <h2>DINAS TENAGA KERJA</h2>
-                <p>Jalan Slamet Riyadi No. 306, Kota Surakarta, Kodepos 57141</p>
-                <p>Telepon: (0271) 714902 | Pos-el: disnaker@surakarta.go.id</p>
-              </div>
-              <div style="width: 75px;"></div>
-            </div>
-
-            <div class="doc-title">
-              <h3>LAPORAN HASIL PENUGASAN</h3>
-            </div>
-
-            <table class="content-table">
-              <tr>
-                <td class="label">Nama Pegawai</td>
-                <td class="colon">:</td>
-                <td class="value"><strong>${pegawaiNama}</strong></td>
-              </tr>
-              ${nipText ? `<tr><td class="label">NIP</td><td class="colon">:</td><td class="value">${nipText}</td></tr>` : ''}
-              <tr>
-                <td class="label">Jabatan</td>
-                <td class="colon">:</td>
-                <td class="value">${jabatanText}</td>
-              </tr>
-              <tr>
-                <td class="label">Bidang / Unit Kerja</td>
-                <td class="colon">:</td>
-                <td class="value">${bidangText}</td>
-              </tr>
-              <tr>
-                <td class="label">Jenis Penugasan</td>
-                <td class="colon">:</td>
-                <td class="value">${lap.jenis_penugasan || '-'}</td>
-              </tr>
-              <tr>
-                <td class="label">Hari / Tanggal</td>
-                <td class="colon">:</td>
-                <td class="value">${tanggal}</td>
-              </tr>
-              <tr>
-                <td class="label">Nama Kegiatan</td>
-                <td class="colon">:</td>
-                <td class="value">${lap.nama_kegiatan || '-'}</td>
-              </tr>
-              <tr>
-                <td class="label">Tempat Kegiatan</td>
-                <td class="colon">:</td>
-                <td class="value">${lap.tempat_kegiatan || '-'}</td>
-              </tr>
-              <tr>
-                <td class="label">Penyelenggara</td>
-                <td class="colon">:</td>
-                <td class="value">${lap.penyelenggara || '-'}</td>
-              </tr>
-              <tr>
-                <td class="label">Tamu Undangan / Peserta</td>
-                <td class="colon">:</td>
-                <td class="value">${lap.tamu_undangan || '-'}</td>
-              </tr>
-            </table>
-
-            <div class="anti-potong" style="margin-top: 14px;">
-              <span class="section-heading">Catatan Hasil Kegiatan:</span>
-              <div style="text-align: justify; text-justify: inter-word; font-size: 10.5pt; line-height: 1.4; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fafafa;">
-                ${formatRichTextForPrint(lap.catatan_hasil)}
-              </div>
-            </div>
-
-            ${
-              lap.catatan_pimpinan
-                ? `
-              <div class="anti-potong" style="margin-top: 14px; border: 1.5px solid #333; padding: 8px 12px; border-radius: 4px; background: #fdfdfd;">
-                <span class="section-heading" style="margin-top: 0; color: #111;">Arahan / Disposisi Pimpinan:</span>
-                <div style="font-size: 10pt; line-height: 1.35; font-style: italic;">
-                  ${formatRichTextForPrint(lap.catatan_pimpinan)}
-                </div>
-              </div>
-            `
-                : ''
-            }
-
-            ${
-              base64Images.length > 0
-                ? `
-              <div class="anti-potong" style="margin-top: 16px;">
-                <span class="section-heading">Dokumentasi Kegiatan:</span>
-                <div class="doc-grid ${base64Images.length === 1 ? 'single-doc' : ''}">
-                  ${base64Images
-                    .map(
-                      (img, idx) => `
-                    <div class="doc-item">
-                      ${
-                        img.isDoc
-                          ? `<div style="height:${base64Images.length === 1 ? '280px' : '220px'}; display:flex; align-items:center; justify-content:center; background:#eee; font-size:10pt; color:#666;">Berkas Foto ${idx + 1}</div>`
-                          : `<img src="${img.src}" alt="Dokumentasi ${idx + 1}" />`
-                      }
-                      <div class="doc-caption">Foto ${idx + 1} - Dokumentasi Kegiatan</div>
-                    </div>
-                  `
-                    )
-                    .join('')}
-                </div>
-              </div>
-            `
-                : ''
-            }
-
-            ${
-              lap.materi_urls && lap.materi_urls.length > 0
-                ? `
-              <div class="anti-potong" style="margin-top: 14px;">
-                <span class="section-heading">Materi Paparan / Lampiran Berkas:</span>
-                <ul class="materi-list">
-                  ${lap.materi_urls
-                    .map(
-                      (url, idx) => `
-                    <li>Berkas ${idx + 1}: <a href="${url}" target="_blank" style="color:#000; text-decoration: underline;">${url}</a></li>
-                  `
-                    )
-                    .join('')}
-                </ul>
-              </div>
-            `
-                : ''
-            }
-
-            <div class="signature-container">
-              <div class="signature-box">
-                <p style="margin-bottom: 55px;">
-                  Surakarta, ${new Date().toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}<br />
-                  Pegawai yang Melaporkan,
-                </p>
-                <p style="font-weight: bold; text-decoration: underline; margin: 0;">${pegawaiNama}</p>
-                ${nipText ? `<p style="margin: 2px 0 0 0; font-size: 9.5pt;">${nipText}</p>` : ''}
-              </div>
-            </div>
-          </body>
-        </html>
-      `)
-      doc.close()
-
-      iframe.onload = () => {
-        setTimeout(() => {
-          iframe.contentWindow?.focus()
-          iframe.contentWindow?.print()
-          setPrintingId(null)
-        }, 800)
-      }
+      await generateLaporanPDF(lap, targetPegawai)
+      Swal.close()
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil Diunduh!',
+        text: 'Dokumen PDF laporan penugasan telah tersimpan di perangkat Anda.',
+        timer: 2000,
+        showConfirmButton: false,
+      })
     } catch (err) {
-      console.error('Error saat proses cetak:', err)
+      console.error('Error saat memproses PDF:', err)
       Swal.fire({
         icon: 'error',
-        title: 'Gagal Memproses Cetak',
-        text: 'Terjadi kendala saat merender dokumen cetak. Silakan coba kembali.',
+        title: 'Gagal Memproses PDF',
+        text: 'Terjadi kendala saat merender dokumen PDF. Silakan coba kembali.',
         confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
       })
-      setPrintingId(null)
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -535,14 +202,14 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
       <div className="bg-slate-900 rounded-2xl p-5 sm:p-6 text-white border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 bg-slate-800 rounded-xl text-primary border border-slate-700/80">
-            <Printer size={24} />
+            <FileDown size={24} />
           </div>
           <div>
             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              Arsip &amp; Cetak Laporan Penugasan
+              Arsip &amp; Download PDF Laporan Penugasan
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
-              Pusat pencarian riwayat laporan kegiatan dinas ASN, pratinjau lampiran berkas, dan cetak lembar resmi A4 kedinasan.
+              Pusat pencarian riwayat laporan kegiatan dinas ASN, pratinjau lampiran berkas, dan unduh dokumen resmi format PDF kedinasan.
             </p>
           </div>
         </div>
@@ -688,7 +355,7 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
                   const namaPegawai = targetPeg?.nama || item.pegawai_id || '-'
                   const nipPegawai = targetPeg?.nip || ''
                   const isPerlu = isPerluTindakLanjut(item.status_tindak_lanjut)
-                  const isCurrentlyPrinting = printingId === item.id
+                  const isCurrentlyDownloading = downloadingId === item.id
 
                   const tanggalStr = item.tanggal_kegiatan
                     ? new Date(item.tanggal_kegiatan).toLocaleDateString('id-ID', {
@@ -769,20 +436,20 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
                             <span>Detail</span>
                           </button>
 
-                          {/* Tombol Cetak */}
+                          {/* Tombol Download PDF */}
                           <button
                             type="button"
-                            onClick={() => prosesCetak(item)}
-                            disabled={isCurrentlyPrinting}
+                            onClick={() => handleDownloadPDF(item)}
+                            disabled={isCurrentlyDownloading}
                             className="px-2.5 py-1 bg-primary text-primary-foreground hover:bg-primary-hover rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-50 shadow-sm"
-                            title="Cetak Lembar Laporan A4"
+                            title="Download Berkas Laporan PDF"
                           >
-                            {isCurrentlyPrinting ? (
+                            {isCurrentlyDownloading ? (
                               <Loader2 size={13} className="animate-spin" />
                             ) : (
-                              <Printer size={13} />
+                              <FileDown size={13} />
                             )}
-                            <span>Cetak</span>
+                            <span>Download PDF</span>
                           </button>
                         </div>
                       </td>
@@ -1039,12 +706,17 @@ export function CetakClient({ initialLaporan = [], pegawaiList = [] }: CetakClie
                 onClick={() => {
                   const item = selectedDetail
                   setSelectedDetail(null)
-                  prosesCetak(item)
+                  handleDownloadPDF(item)
                 }}
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary-hover font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                disabled={downloadingId === selectedDetail.id}
+                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary-hover font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
               >
-                <Printer size={15} />
-                <span>Cetak Lembar Laporan Ini</span>
+                {downloadingId === selectedDetail.id ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <FileDown size={15} />
+                )}
+                <span>Unduh Lembar PDF</span>
               </button>
             </div>
           </div>

@@ -68,13 +68,13 @@ const mockLaporanList: Laporan[] = [
   },
 ]
 
-describe('CetakClient - Pusat Arsip & Print Hub (TDD)', () => {
+describe('CetakClient - Pusat Arsip & Download PDF Hub (TDD)', () => {
   it('renders CetakClient with initialLaporan and pegawaiList without throwing', () => {
     const html = renderToString(
       <CetakClient initialLaporan={mockLaporanList} pegawaiList={mockPegawaiList} />
     )
     expect(html).toBeDefined()
-    expect(html).toContain('Arsip &amp; Cetak Laporan')
+    expect(html).toContain('Arsip &amp; Download PDF Laporan')
   })
 
   it('renders search bar and filter controls', () => {
@@ -91,7 +91,7 @@ describe('CetakClient - Pusat Arsip & Print Hub (TDD)', () => {
     )
     expect(html).toContain('Rapat Koordinasi Integrasi SIMPELGAS')
     expect(html).toContain('Monev Ketenagakerjaan Perusahaan A')
-    expect(html).toContain('Cetak')
+    expect(html).toContain('Download PDF')
     expect(html).toContain('Detail')
   })
 })
