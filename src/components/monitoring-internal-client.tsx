@@ -6,6 +6,7 @@ import Swal from 'sweetalert2'
 import { submitKegiatanInternal } from '@/lib/actions'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
 import { useSpeechToText } from '@/lib/use-speech-to-text'
+import { formatSpeechText, mergeTranscript } from '@/lib/speech-formatter'
 import { AiCompareModal } from '@/components/ui/ai-compare-modal'
 import type { Pegawai } from '@/lib/types'
 
@@ -107,14 +108,12 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
     }))
   }
 
-  const { isListening, toggleListening } = useSpeechToText({
+  const { isListening, interimText, toggleListening } = useSpeechToText({
     lang: 'id-ID',
     onTranscript: (chunk, isFinal) => {
       if (isFinal) {
-        setHasilText((prev) => {
-          const trimmed = prev.trim()
-          return trimmed ? `${trimmed}\n${chunk}` : chunk
-        })
+        const formatted = formatSpeechText(chunk)
+        setHasilText((prev) => mergeTranscript(prev, formatted))
       }
     },
     onError: (err) => {
@@ -375,6 +374,13 @@ export function MonitoringInternalClient({ pegawaiList }: MonitoringInternalClie
                 </button>
               </div>
             </div>
+            {isListening && interimText && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 bg-rose-50/80 border border-rose-100 rounded-lg animate-in fade-in duration-150">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                <span className="font-semibold text-rose-700">Mendengar:</span>
+                <span className="italic truncate">{interimText}</span>
+              </div>
+            )}
             <textarea
               name="hasil_kegiatan"
               id="mi_hasil"
