@@ -38,7 +38,7 @@
   - `getAllLaporan`: `() => Promise<Laporan[]>` (cached, deduplicated dengan `getPegawai`)
   - `refreshData`: `(tag?: 'laporan' | 'pegawai' | 'all') => Promise<{ status: string; message: string }>`
 
-- [ ] **Step 1: Tulis unit test untuk `refreshData` dan cache revalidation di `tests/actions.test.ts`**
+- [x] **Step 1: Tulis unit test untuk `refreshData` dan cache revalidation di `tests/actions.test.ts`**
 
 ```typescript
 // Tambahkan test case di tests/actions.test.ts
@@ -54,12 +54,12 @@ describe('refreshData action', () => {
 })
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan test baru gagal (RED)**
+- [x] **Step 2: Jalankan test untuk memastikan test baru gagal (RED)**
 
 Run: `npx vitest run tests/actions.test.ts`  
 Expected: FAIL dengan `refreshData is not a function` atau compile error.
 
-- [ ] **Step 3: Implementasikan `unstable_cache`, de-duplikasi, dan `refreshData` di `src/lib/actions.ts`**
+- [x] **Step 3: Implementasikan `unstable_cache`, de-duplikasi, dan `refreshData` di `src/lib/actions.ts`**
 
 1. Bungkus pembacaan data pegawai dan laporan dengan `unstable_cache`:
 ```typescript
@@ -139,12 +139,12 @@ export async function refreshData(target: 'laporan' | 'pegawai' | 'all' = 'all')
 }
 ```
 
-- [ ] **Step 4: Jalankan test untuk memverifikasi pass (GREEN)**
+- [x] **Step 4: Jalankan test untuk memverifikasi pass (GREEN)**
 
 Run: `npx vitest run tests/actions.test.ts`  
 Expected: PASS 100%.
 
-- [ ] **Step 5: Commit perubahan Task 1**
+- [x] **Step 5: Commit perubahan Task 1**
 
 ```bash
 git add src/lib/actions.ts tests/actions.test.ts
@@ -169,7 +169,7 @@ git commit -m "perf(actions): add unstable_cache, deduplicate getPegawai, and ad
 - Produces:
   - Next.js route loading components (default export)
 
-- [ ] **Step 1: Tulis unit test di `tests/ui-states.test.tsx` untuk memverifikasi loading components**
+- [x] **Step 1: Tulis unit test di `tests/ui-states.test.tsx` untuk memverifikasi loading components**
 
 ```typescript
 import DashboardLoading from '@/app/dashboard/loading'
@@ -200,24 +200,24 @@ describe('Route Loading Skeletons', () => {
 })
 ```
 
-- [ ] **Step 2: Jalankan test untuk memastikan test gagal (RED)**
+- [x] **Step 2: Jalankan test untuk memastikan test gagal (RED)**
 
 Run: `npx vitest run tests/ui-states.test.tsx`  
 Expected: FAIL karena modul `loading.tsx` belum ada.
 
-- [ ] **Step 3: Buat implementasi `loading.tsx` untuk masing-masing rute**
+- [x] **Step 3: Buat implementasi `loading.tsx` untuk masing-masing rute**
 
 1. `src/app/dashboard/loading.tsx`: Kerangka header, 4 kartu KPI, filter bar, dan panel statistik/list.
 2. `src/app/input/loading.tsx`: Kerangka judul form, dropdown pegawai, radio jenis tugas, inputs, dan dropzone lampiran.
 3. `src/app/cetak/loading.tsx`: Kerangka filter pencarian laporan dan lembar kertas cetak A4.
 4. `src/app/pimpinan/loading.tsx`: Kerangka panel pimpinan, toolbar ekspor/sinkronisasi, dan list kartu penugasan.
 
-- [ ] **Step 4: Jalankan test verifikasi dan token audit (GREEN)**
+- [x] **Step 4: Jalankan test verifikasi dan token audit (GREEN)**
 
 Run: `npx vitest run tests/ui-states.test.tsx && npx vitest run tests/design-tokens.test.ts`  
 Expected: PASS 100% tanpa pelanggaran token warna atau ikon.
 
-- [ ] **Step 5: Commit perubahan Task 2**
+- [x] **Step 5: Commit perubahan Task 2**
 
 ```bash
 git add src/app/*/loading.tsx tests/ui-states.test.tsx
@@ -242,7 +242,7 @@ git commit -m "feat(ui): add modular streaming loading skeletons for all major r
 - Produces:
   - Tombol sinkronisasi instan di UI dengan visual feedback spinner dan toast notification.
 
-- [ ] **Step 1: Update `handleRefresh` di `src/components/dashboard-client.tsx`**
+- [x] **Step 1: Update `handleRefresh` di `src/components/dashboard-client.tsx`**
 
 Panggil Server Action `refreshData()` agar cache di server di-bust sebelum `router.refresh()`:
 ```typescript
@@ -259,7 +259,7 @@ const handleRefresh = async () => {
 }
 ```
 
-- [ ] **Step 2: Tambahkan tombol "Sinkronkan Data" di toolbar `src/components/pimpinan-client.tsx`**
+- [x] **Step 2: Tambahkan tombol "Sinkronkan Data" di toolbar `src/components/pimpinan-client.tsx`**
 
 1. Tambahkan state `isRefreshing` dan handler `handleSync`:
 ```typescript
@@ -301,12 +301,12 @@ const handleSync = async () => {
 </button>
 ```
 
-- [ ] **Step 3: Jalankan verifikasi lint dan token**
+- [x] **Step 3: Jalankan verifikasi lint dan token**
 
 Run: `npm run lint && npx vitest run tests/design-tokens.test.ts`  
 Expected: 0 lint errors, design token tests PASS 100%.
 
-- [ ] **Step 4: Commit perubahan Task 3**
+- [x] **Step 4: Commit perubahan Task 3**
 
 ```bash
 git add src/components/dashboard-client.tsx src/components/pimpinan-client.tsx
@@ -320,17 +320,18 @@ git commit -m "feat(ui): connect refresh buttons to refreshData action in dashbo
 **Files:**
 - Test seluruh project via scripts
 
-- [ ] **Step 1: Jalankan Gate 1 (Static Quality)**
+- [x] **Step 1: Jalankan Gate 1 (Static Quality)**
 Run: `npm run lint && npm run typecheck`  
 Expected: 0 error, 0 warning.
 
-- [ ] **Step 2: Jalankan Gate 2 (Unit Testing)**
+- [x] **Step 2: Jalankan Gate 2 (Unit Testing)**
 Run: `npm test`  
 Expected: 100% test suites pass.
 
-- [ ] **Step 3: Jalankan Gate 3 & 4 (Local CI & Build)**
+- [x] **Step 3: Jalankan Gate 3 & 4 (Local CI & Build)**
 Run: `npm run ci:local`  
 Expected: Exit code 0, build Next.js sukses.
 
-- [ ] **Step 4: Verifikasi Gate 5 (Manual & Walkthrough)**
+- [x] **Step 4: Verifikasi Gate 5 (Manual & Walkthrough)**
 Buat dokumentasi `walkthrough.md` yang merangkum hasil pengujian performa sebelum vs sesudah optimasi.
+
