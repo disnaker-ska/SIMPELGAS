@@ -30,34 +30,22 @@ import {
 // ============================================================
 
 // Master data pegawai: TTL 30 menit (1800 detik)
-export const getCachedPegawai = unstable_cache(
-  async (): Promise<Pegawai[]> => {
-    return fetchPegawaiFromAppsScript()
-  },
+export const getPegawai = unstable_cache(
+  async (): Promise<Pegawai[]> => fetchPegawaiFromAppsScript(),
   ['pegawai-list'],
   { tags: ['pegawai'], revalidate: 1800 }
 )
 
-export async function getPegawai(): Promise<Pegawai[]> {
-  return getCachedPegawai()
-}
-
 // Rekap laporan: TTL 60 detik (1 menit)
-export const getCachedLaporan = unstable_cache(
-  async (namaPegawai?: string): Promise<Laporan[]> => {
-    return fetchLaporanFromAppsScript(namaPegawai)
-  },
+export const getLaporan = unstable_cache(
+  async (namaPegawai?: string): Promise<Laporan[]> => fetchLaporanFromAppsScript(namaPegawai),
   ['laporan-list'],
   { tags: ['laporan'], revalidate: 60 }
 )
 
-export async function getLaporan(namaPegawai?: string): Promise<Laporan[]> {
-  return getCachedLaporan(namaPegawai)
-}
-
 export async function getAllLaporan(): Promise<Laporan[]> {
   const [laporanList, pegawaiList] = await Promise.all([
-    getCachedLaporan(),
+    getLaporan(),
     getPegawai(),
   ])
 
