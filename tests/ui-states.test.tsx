@@ -28,3 +28,35 @@ describe('UI State Components', () => {
     expect(el.props.children).toBeDefined()
   })
 })
+
+describe('Route Loading Skeletons', () => {
+  it('renders DashboardLoading with skeleton elements', async () => {
+    const { default: DashboardLoading } = await import('../src/app/dashboard/loading')
+    const el = DashboardLoading()
+    expect(el).toBeDefined()
+  })
+
+  it('renders InputLoading with skeleton elements', async () => {
+    const { default: InputLoading } = await import('../src/app/input/loading')
+    const el = InputLoading()
+    expect(el).toBeDefined()
+  })
+
+  it('renders CetakLoading with skeleton elements', async () => {
+    const { default: CetakLoading } = await import('../src/app/cetak/loading')
+    const el = CetakLoading()
+    expect(el).toBeDefined()
+  })
+
+  it('renders PimpinanLoading with skeleton elements', async () => {
+    const { default: PimpinanLoading } = await import('../src/app/pimpinan/loading')
+    const el = PimpinanLoading()
+    expect(el).toBeDefined()
+  })
+
+  it('renders RootLoading with skeleton elements', async () => {
+    const { default: RootLoading } = await import('../src/app/loading')
+    const el = RootLoading()
+    expect(el).toBeDefined()
+  })
+})
