@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserCheck, Lock, Save, Calendar, Check, CheckCircle2, Loader2, Inbox, FileSpreadsheet, FileDown } from 'lucide-react'
+import { UserCheck, Lock, Save, Calendar, Check, CheckCircle2, Loader2, Inbox, FileSpreadsheet, FileDown, RefreshCw } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import Swal from 'sweetalert2'
-import { logoutPimpinan, updateEvaluasiPimpinan } from '@/lib/actions'
+import { logoutPimpinan, updateEvaluasiPimpinan, refreshData } from '@/lib/actions'
 import type { Laporan, Pegawai } from '@/lib/types'
 import { EmptyState } from '@/components/ui/empty-state'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
@@ -75,6 +75,30 @@ export function PimpinanClient({ initialLaporan, pegawaiList, session }: Pimpina
   const [activeScopes] = useState(session.scopes)
   const [laporanList, setLaporanList] = useState<LaporanWithEdit[]>([])
   const [isExporting, setIsExporting] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleSync = async () => {
+    setIsRefreshing(true)
+    try {
+      await refreshData('all')
+      router.refresh()
+      Swal.fire({
+        icon: 'success',
+        title: 'Tersinkronisasi',
+        text: 'Data laporan terbaru berhasil disinkronkan dari server.',
+        timer: 1500,
+        showConfirmButton: false,
+      })
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Sinkronisasi',
+        text: error?.message || 'Terjadi kesalahan saat menyinkronkan data.',
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     if (initialLaporan) {
@@ -266,6 +290,15 @@ export function PimpinanClient({ initialLaporan, pegawaiList, session }: Pimpina
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+          <button
+            onClick={handleSync}
+            disabled={isRefreshing || isExporting}
+            title="Sinkronkan data terbaru dari spreadsheet"
+            className="flex items-center gap-1.5 px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold hover:bg-sky-100 transition-all duration-150 cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Sinkronisasi...' : 'Sinkronkan'}</span>
+          </button>
           <button
             onClick={() => exportRecap('xlsx')}
             disabled={isExporting}

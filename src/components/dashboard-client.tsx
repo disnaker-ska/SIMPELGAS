@@ -26,6 +26,7 @@ import {
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import type { Laporan, DashboardStats, Pegawai } from '@/lib/types'
+import { refreshData } from '@/lib/actions'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
@@ -184,10 +185,16 @@ export function DashboardClient({
     return filteredData.slice(0, 5)
   }, [filteredData])
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    router.refresh()
-    setTimeout(() => setIsRefreshing(false), 800)
+    try {
+      await refreshData('all')
+      router.refresh()
+    } catch (err) {
+      console.error('Refresh error:', err)
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 600)
+    }
   }
 
   const hasActiveFilter =
