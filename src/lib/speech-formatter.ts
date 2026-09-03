@@ -5,15 +5,26 @@
 
 const SPOKEN_NUMBERS: Record<string, number> = {
   satu: 1,
+  kesatu: 1,
+  pertama: 1,
   dua: 2,
+  kedua: 2,
   tiga: 3,
+  ketiga: 3,
   empat: 4,
+  keempat: 4,
   lima: 5,
+  kelima: 5,
   enam: 6,
+  keenam: 6,
   tujuh: 7,
+  ketujuh: 7,
   delapan: 8,
+  kedelapan: 8,
   sembilan: 9,
+  kesembilan: 9,
   sepuluh: 10,
+  kesepuluh: 10,
 }
 
 /**
@@ -24,10 +35,10 @@ export function formatSpeechText(raw: string): string {
 
   let text = raw.trim()
 
-  // 1. Konversi format numbering seperti: "poin 1", "poin satu", "nomor 2", "nomor dua"
+  // 1. Konversi format numbering seperti: "poin 1", "poin satu", "poin nomor 1", "nomor poin 2", "poin ke-1"
   const numberWordPattern = Object.keys(SPOKEN_NUMBERS).join('|')
   const poinRegex = new RegExp(
-    `\\b(?:poin|nomor)\\s+(${numberWordPattern}|\\d+)\\b`,
+    `\\b(?:poin|nomor)(?:\\s+(?:nomor|poin|ke[-\\s]?|ke))*\\s*(${numberWordPattern}|\\d+)\\b`,
     'gi'
   )
   text = text.replace(poinRegex, (_, match) => {
@@ -75,15 +86,29 @@ export function mergeTranscript(baseText: string, newChunk: string): string {
   if (!base) return chunk
   if (!chunk) return base
 
+  const isListOrNewline = (str: string) => /^\d+\.\s/.test(str) || str.startsWith('\n')
+  const isNumberedItem = (str: string) => /^\d+\.\s/.test(str) || /^\n\d+\.\s/.test(str)
+
+  // 1. Bersihkan sisa kata marker sementara (misal: "Poin", "Poin nomor") di akhir teks dasar saat item bernomor tiba
+  if (isNumberedItem(chunk)) {
+    const trailingMarkerRegex = /(?:[ \t]*\n[ \t]*|\s+|^)(?:poin|nomor)(?:\s+(?:nomor|poin|ke[-\s]?|ke))*\s*$/i
+    if (trailingMarkerRegex.test(base)) {
+      const cleanedBase = base.replace(trailingMarkerRegex, '').trimEnd()
+      if (!cleanedBase) {
+        return chunk.trimStart()
+      }
+      return `${cleanedBase}\n${chunk.trimStart()}`
+    }
+  }
+
   const baseLower = base.toLowerCase()
   const chunkLower = chunk.toLowerCase()
 
-  // 1. Kasus superset penuh: seluruh chunk baru mencakup seluruh baseText
+  // 2. Kasus superset penuh: seluruh chunk baru mencakup seluruh baseText
   if (chunkLower.startsWith(baseLower)) {
     return chunk
   }
 
-  const isListOrNewline = (str: string) => /^\d+\.\s/.test(str) || str.startsWith('\n')
   const endsWithTerminator = (str: string) => /[.?!]$/.test(str.trim())
   const lowerFirstIfMidSentence = (target: string, prevText: string) => {
     if (!endsWithTerminator(prevText) && !prevText.endsWith('\n') && !isListOrNewline(target)) {

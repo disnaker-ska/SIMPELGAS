@@ -30,7 +30,15 @@ describe('Speech Formatter & Anti-Duplication Engine', () => {
       expect(output).toBe('1. Perkenalan peserta\n2. Materi inti\n3. Sesi tanya jawab')
     })
 
-    it('5. Does not convert "poin" or "nomor" if not followed by a number or digit', () => {
+    it('5. Converts compound numbering markers (poin nomor 1, poin nomor satu, poin ke-1)', () => {
+      expect(formatSpeechText('Poin nomor 1 pembahasan anggaran')).toBe('1. Pembahasan anggaran')
+      expect(formatSpeechText('poin nomor satu agenda rapat')).toBe('1. Agenda rapat')
+      expect(formatSpeechText('nomor poin 2 evaluasi kinerja')).toBe('2. Evaluasi kinerja')
+      expect(formatSpeechText('poin ke 3 tindak lanjut')).toBe('3. Tindak lanjut')
+      expect(formatSpeechText('poin ke-4 penutupan')).toBe('4. Penutupan')
+    })
+
+    it('6. Does not convert "poin" or "nomor" if not followed by a number or digit', () => {
       const input = 'ini adalah poin penting mengenai nomor telepon dinas'
       const output = formatSpeechText(input)
       expect(output).toBe('Ini adalah poin penting mengenai nomor telepon dinas')
@@ -107,6 +115,30 @@ describe('Speech Formatter & Anti-Duplication Engine', () => {
 
       text = mergeTranscript(text, formatSpeechText('membahas anggaran'))
       expect(text).toBe('Rapat dinas membahas anggaran')
+    })
+
+    it('15. Strips dangling marker words (Poin, Poin nomor) when followed by numbered list item', () => {
+      // Incremental simulation: user speaks "Poin", then "Poin nomor", then "Poin nomor 1 pembahasan"
+      let text = ''
+      text = mergeTranscript(text, formatSpeechText('poin'))
+      expect(text).toBe('Poin')
+
+      text = mergeTranscript(text, formatSpeechText('poin nomor'))
+      expect(text).toBe('Poin nomor')
+
+      text = mergeTranscript(text, formatSpeechText('poin nomor 1 pembahasan'))
+      expect(text).toBe('1. Pembahasan')
+
+      // Incremental simulation on existing content
+      let note = 'Hasil rapat:'
+      note = mergeTranscript(note, formatSpeechText('poin'))
+      expect(note).toBe('Hasil rapat: poin')
+
+      note = mergeTranscript(note, formatSpeechText('poin nomor'))
+      expect(note).toBe('Hasil rapat: poin nomor')
+
+      note = mergeTranscript(note, formatSpeechText('poin nomor 1 tindak lanjut'))
+      expect(note).toBe('Hasil rapat:\n1. Tindak lanjut')
     })
   })
 })
