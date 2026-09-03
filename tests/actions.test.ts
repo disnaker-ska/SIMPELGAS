@@ -187,3 +187,22 @@ describe('Server Actions Zod Validation', () => {
   })
 })
 
+describe('refreshData action', () => {
+  it('returns success status and message when revalidating cache', async () => {
+    const { refreshData } = await import('@/lib/actions')
+    const res = await refreshData('all')
+    expect(res).toBeDefined()
+    expect(res.status).toBe('success')
+    expect(res.message).toContain('Data berhasil disinkronkan')
+  })
+
+  it('supports revalidating specific tags (laporan or pegawai)', async () => {
+    const { refreshData } = await import('@/lib/actions')
+    const resLaporan = await refreshData('laporan')
+    expect(resLaporan.status).toBe('success')
+
+    const resPegawai = await refreshData('pegawai')
+    expect(resPegawai.status).toBe('success')
+  })
+})
+

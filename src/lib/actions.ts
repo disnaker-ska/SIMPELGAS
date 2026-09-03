@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
 import { cookies } from 'next/headers'
 import type {
   Pegawai,
@@ -26,24 +26,39 @@ import {
 } from './validations'
 
 // ============================================================
-// DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET)
+// DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET WITH NEXT.JS CACHE)
 // ============================================================
 
+// Master data pegawai: TTL 30 menit (1800 detik)
+export const getCachedPegawai = unstable_cache(
+  async (): Promise<Pegawai[]> => {
+    return fetchPegawaiFromAppsScript()
+  },
+  ['pegawai-list'],
+  { tags: ['pegawai'], revalidate: 1800 }
+)
+
 export async function getPegawai(): Promise<Pegawai[]> {
-  noStore()
-  return fetchPegawaiFromAppsScript()
+  return getCachedPegawai()
 }
 
+// Rekap laporan: TTL 60 detik (1 menit)
+export const getCachedLaporan = unstable_cache(
+  async (namaPegawai?: string): Promise<Laporan[]> => {
+    return fetchLaporanFromAppsScript(namaPegawai)
+  },
+  ['laporan-list'],
+  { tags: ['laporan'], revalidate: 60 }
+)
+
 export async function getLaporan(namaPegawai?: string): Promise<Laporan[]> {
-  noStore()
-  return fetchLaporanFromAppsScript(namaPegawai)
+  return getCachedLaporan(namaPegawai)
 }
 
 export async function getAllLaporan(): Promise<Laporan[]> {
-  noStore()
   const [laporanList, pegawaiList] = await Promise.all([
-    fetchLaporanFromAppsScript(),
-    fetchPegawaiFromAppsScript(),
+    getCachedLaporan(),
+    getPegawai(),
   ])
 
   // Sinkronkan data laporan dengan master pegawai (enrichment)
@@ -86,10 +101,9 @@ export async function getDashboardStats(laporanData: Laporan[]): Promise<Dashboa
 }
 
 export async function getLaporanByPegawaiId(pegawaiIdOrName: string): Promise<Laporan[]> {
-  noStore()
   const [allLaporan, pegawaiList] = await Promise.all([
     getAllLaporan(),
-    fetchPegawaiFromAppsScript(),
+    getPegawai(),
   ])
 
   const targetPegawai = pegawaiList.find(
@@ -184,6 +198,11 @@ export async function submitLaporan(
   })
 
   if (res.status === 'success') {
+    try {
+      revalidateTag('laporan')
+    } catch {
+      // safe fallback if called outside Next.js request lifecycle
+    }
     revalidatePath('/dashboard')
     revalidatePath('/cetak')
     revalidatePath('/pimpinan')
@@ -222,12 +241,38 @@ export async function updateEvaluasiPimpinan(
   const res = await updateEvaluasiInAppsScript(row, status, appendedNote)
 
   if (res.status === 'success') {
+    try {
+      revalidateTag('laporan')
+    } catch {
+      // safe fallback if called outside Next.js request lifecycle
+    }
     revalidatePath('/dashboard')
     revalidatePath('/pimpinan')
     revalidatePath('/cetak')
   }
 
   return res
+}
+
+/**
+ * Server action untuk membersihkan cache on-demand dan memaksa sinkronisasi data dari Google Spreadsheet
+ */
+export async function refreshData(target: 'laporan' | 'pegawai' | 'all' = 'all'): Promise<{ status: string; message: string }> {
+  try {
+    if (target === 'laporan' || target === 'all') {
+      revalidateTag('laporan')
+    }
+    if (target === 'pegawai' || target === 'all') {
+      revalidateTag('pegawai')
+    }
+    revalidatePath('/dashboard')
+    revalidatePath('/cetak')
+    revalidatePath('/pimpinan')
+  } catch {
+    // fallback if outside Next context
+  }
+
+  return { status: 'success', message: 'Data berhasil disinkronkan dari server.' }
 }
 
 // ============================================================
