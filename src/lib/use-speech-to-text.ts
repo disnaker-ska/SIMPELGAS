@@ -106,26 +106,30 @@ export class SpeechToTextController {
       }
 
       this.recognition.onresult = (event: any) => {
-        let finalTranscript = ''
-        let interimTranscript = ''
+        const finalParts: string[] = []
+        const interimParts: string[] = []
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const item = event.results[i]
+          const transcript = item?.[0]?.transcript || ''
           if (item.isFinal) {
-            finalTranscript += item[0].transcript
+            finalParts.push(transcript)
           } else {
-            interimTranscript += item[0].transcript
+            interimParts.push(transcript)
           }
         }
 
+        const interimTranscript = interimParts.join(' ').trim()
+        const finalTranscript = finalParts.join(' ').trim()
+
         if (interimTranscript) {
-          this.options.onInterim?.(interimTranscript.trim())
-          this.options.onTranscript?.(interimTranscript.trim(), false)
+          this.options.onInterim?.(interimTranscript)
+          this.options.onTranscript?.(interimTranscript, false)
         }
 
         if (finalTranscript) {
           this.options.onInterim?.('')
-          this.options.onTranscript?.(finalTranscript.trim(), true)
+          this.options.onTranscript?.(finalTranscript, true)
         }
       }
 

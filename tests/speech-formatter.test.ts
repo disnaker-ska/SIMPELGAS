@@ -70,5 +70,43 @@ describe('Speech Formatter & Anti-Duplication Engine', () => {
       const addition = '2. Evaluasi kinerja'
       expect(mergeTranscript(base, addition)).toBe('1. Pembahasan anggaran\n2. Evaluasi kinerja')
     })
+
+    it('12. Prevents duplication after a long pause when a new utterance arrives with cumulative chunks', () => {
+      let text = 'Aku menghadiri rapat internal.'
+      // User pauses, then starts speaking new phrase
+      text = mergeTranscript(text, formatSpeechText('pembahasan'))
+      expect(text).toBe('Aku menghadiri rapat internal. Pembahasan')
+
+      // Cumulative update of the new phrase
+      text = mergeTranscript(text, formatSpeechText('pembahasan anggaran'))
+      expect(text).toBe('Aku menghadiri rapat internal. Pembahasan anggaran')
+
+      // Further cumulative update of the new phrase with punctuation
+      text = mergeTranscript(text, formatSpeechText('pembahasan anggaran kegiatan titik'))
+      expect(text).toBe('Aku menghadiri rapat internal. Pembahasan anggaran kegiatan.')
+    })
+
+    it('13. Prevents duplication on multi-line numbering list across pauses', () => {
+      let text = 'Hasil kegiatan:\n1. Pembahasan anggaran'
+      // User pauses for 10s, then starts item 2
+      text = mergeTranscript(text, formatSpeechText('poin 2 evaluasi'))
+      expect(text).toBe('Hasil kegiatan:\n1. Pembahasan anggaran\n2. Evaluasi')
+
+      text = mergeTranscript(text, formatSpeechText('poin 2 evaluasi kinerja'))
+      expect(text).toBe('Hasil kegiatan:\n1. Pembahasan anggaran\n2. Evaluasi kinerja')
+
+      text = mergeTranscript(text, formatSpeechText('poin 2 evaluasi kinerja triwulan'))
+      expect(text).toBe('Hasil kegiatan:\n1. Pembahasan anggaran\n2. Evaluasi kinerja triwulan')
+    })
+
+    it('14. Does not duplicate when unpunctuated speech is followed by pause and continuing cumulative speech', () => {
+      let text = 'Rapat dinas'
+      // Pause, then speaks
+      text = mergeTranscript(text, formatSpeechText('membahas'))
+      expect(text).toBe('Rapat dinas membahas')
+
+      text = mergeTranscript(text, formatSpeechText('membahas anggaran'))
+      expect(text).toBe('Rapat dinas membahas anggaran')
+    })
   })
 })

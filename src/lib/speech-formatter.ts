@@ -65,7 +65,8 @@ export function formatSpeechText(raw: string): string {
 }
 
 /**
- * Menggabungkan teks dasar dengan chunk transkripsi baru secara cerdas tanpa duplikasi kumulatif
+ * Menggabungkan teks dasar dengan chunk transkripsi baru secara cerdas tanpa duplikasi kumulatif,
+ * baik saat dikte mengalir maupun setelah jeda bicara yang panjang.
  */
 export function mergeTranscript(baseText: string, newChunk: string): string {
   const base = (baseText || '').trim()
@@ -77,34 +78,72 @@ export function mergeTranscript(baseText: string, newChunk: string): string {
   const baseLower = base.toLowerCase()
   const chunkLower = chunk.toLowerCase()
 
-  // Kasus 1: Seluruh chunk baru adalah perpanjangan kumulatif dari seluruh baseText
+  // 1. Kasus superset penuh: seluruh chunk baru mencakup seluruh baseText
   if (chunkLower.startsWith(baseLower)) {
     return chunk
   }
 
-  // Kasus 2: Chunk baru adalah perpanjangan kumulatif dari baris terakhir baseText
-  const lines = base.split('\n')
-  const lastLine = lines[lines.length - 1].trim()
-  if (lastLine && chunkLower.startsWith(lastLine.toLowerCase())) {
-    lines[lines.length - 1] = chunk
-    return lines.join('\n')
+  const isListOrNewline = (str: string) => /^\d+\.\s/.test(str) || str.startsWith('\n')
+  const endsWithTerminator = (str: string) => /[.?!]$/.test(str.trim())
+  const lowerFirstIfMidSentence = (target: string, prevText: string) => {
+    if (!endsWithTerminator(prevText) && !prevText.endsWith('\n') && !isListOrNewline(target)) {
+      if (/^[A-Z][a-z]/.test(target)) {
+        return target.charAt(0).toLowerCase() + target.slice(1)
+      }
+    }
+    return target
   }
 
-  // Kasus 3: Chunk baru dimulai dengan penomoran daftar (misal: "1. ...", "2. ...")
-  if (/^\d+\.\s/.test(chunk)) {
+  // 2. Tokenisasi kata untuk deteksi overlap suffix-prefix (sliding window)
+  const baseMatches = [...base.matchAll(/\S+/g)]
+  const chunkMatches = [...chunk.matchAll(/\S+/g)]
+
+  if (baseMatches.length > 0 && chunkMatches.length > 0) {
+    const norm = (w: string) => w.toLowerCase().replace(/[^a-z0-9]/gi, '')
+    const maxK = Math.min(baseMatches.length, chunkMatches.length)
+
+    for (let k = maxK; k >= 1; k--) {
+      let isMatch = true
+      for (let j = 0; j < k; j++) {
+        const baseWord = norm(baseMatches[baseMatches.length - k + j][0])
+        const chunkWord = norm(chunkMatches[j][0])
+        if (baseWord !== chunkWord) {
+          isMatch = false
+          break
+        }
+      }
+
+      if (isMatch) {
+        // Jika overlap hanya 1 kata, pastikan kata terakhir di base tidak diakhiri tanda baca terminal
+        // agar tidak menghapus kalimat yang sah selesai (misal: "Rapat selesai." vs "Selesai jam 9.")
+        const matchedBaseRaw = baseMatches[baseMatches.length - k][0]
+        if (k === 1 && /[.?!]$/.test(matchedBaseRaw)) {
+          continue
+        }
+
+        const overlapIndex = baseMatches[baseMatches.length - k].index ?? 0
+        const beforeOverlap = base.slice(0, overlapIndex).trimEnd()
+
+        if (!beforeOverlap) {
+          return chunk
+        }
+
+        if (beforeOverlap.endsWith('\n') || isListOrNewline(chunk)) {
+          return `${beforeOverlap}\n${chunk.trimStart()}`
+        }
+
+        const adjustedChunk = lowerFirstIfMidSentence(chunk.trimStart(), beforeOverlap)
+        return `${beforeOverlap} ${adjustedChunk}`
+      }
+    }
+  }
+
+  // 3. Kasus penomoran baru (misal: "1. ...", "2. ...") atau diawali newline
+  if (isListOrNewline(chunk) || newChunk.startsWith('\n') || baseText.endsWith('\n')) {
     return `${base}\n${chunk}`
   }
 
-  // Kasus 4: Chunk baru diawali newline
-  if (newChunk.startsWith('\n')) {
-    return `${base}\n${chunk}`
-  }
-
-  // Kasus 5: Base berakhir dengan newline
-  if (baseText.endsWith('\n')) {
-    return `${base}\n${chunk}`
-  }
-
-  // Kasus 6: Kalimat bersambung biasa -> gabungkan dengan spasi
-  return `${base} ${chunk}`
+  // 4. Kalimat baru biasa -> sambungkan dengan spasi
+  const adjustedChunk = lowerFirstIfMidSentence(chunk, base)
+  return `${base} ${adjustedChunk}`
 }
