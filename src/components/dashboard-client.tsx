@@ -22,11 +22,13 @@ import {
   ArrowRight,
   FileDown,
   Sparkles,
+  Award,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import type { Laporan, DashboardStats, Pegawai } from '@/lib/types'
 import { refreshData } from '@/lib/actions'
+import { normalizePersonName } from '@/lib/appscript'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
@@ -179,6 +181,89 @@ export function DashboardClient({
       jenis: jenisList,
     }
   }, [filteredData])
+
+  // Status summary statistics (Untuk Diketahui, Perlu Tindak Lanjut, Sudah Dievaluasi)
+  const statusStats = useMemo(() => {
+    let untukDiketahui = 0
+    let perluTindakLanjut = 0
+    let sudahDievaluasi = 0
+
+    filteredData.forEach((item) => {
+      if (isPerluTindakLanjut(item.status_tindak_lanjut || '')) {
+        perluTindakLanjut++
+      } else {
+        untukDiketahui++
+      }
+
+      if (item.catatan_pimpinan && item.catatan_pimpinan.trim() !== '') {
+        sudahDievaluasi++
+      }
+    })
+
+    const total = filteredData.length
+    return {
+      untukDiketahui,
+      untukDiketahuiPct: total > 0 ? Math.round((untukDiketahui / total) * 100) : 0,
+      perluTindakLanjut,
+      perluTindakLanjutPct: total > 0 ? Math.round((perluTindakLanjut / total) * 100) : 0,
+      sudahDievaluasi,
+      sudahDievaluasiPct: total > 0 ? Math.round((sudahDievaluasi / total) * 100) : 0,
+    }
+  }, [filteredData])
+
+  // Top 5 Pegawai yang sering bertugas tugas luar (toleran terhadap variasi gelar)
+  const topPegawaiList = useMemo(() => {
+    const masterMap = new Map<string, Pegawai>()
+    if (pegawaiList && pegawaiList.length > 0) {
+      pegawaiList.forEach((p) => {
+        const norm = normalizePersonName(p.nama)
+        if (norm && !masterMap.has(norm)) {
+          masterMap.set(norm, p)
+        }
+      })
+    }
+
+    const countMap = new Map<string, { count: number; rawName: string; bidang?: string; jabatan?: string }>()
+
+    filteredData.forEach((item) => {
+      const rawName = item.pegawai?.nama || item.pegawai_id || ''
+      const norm = normalizePersonName(rawName)
+      if (!norm) return
+
+      const existing = countMap.get(norm)
+      if (existing) {
+        existing.count += 1
+      } else {
+        countMap.set(norm, {
+          count: 1,
+          rawName,
+          bidang: item.bidang || item.pegawai?.bidang,
+          jabatan: item.jabatan || item.pegawai?.jabatan,
+        })
+      }
+    })
+
+    const total = filteredData.length
+    const sorted = Array.from(countMap.entries())
+      .map(([norm, val]) => {
+        const master = masterMap.get(norm)
+        const nama = master?.nama || val.rawName
+        const bidang = master?.bidang || val.bidang || 'Lainnya'
+        const jabatan = master?.jabatan || val.jabatan || 'Staff'
+        return {
+          id: master?.id || norm,
+          nama,
+          bidang,
+          jabatan,
+          count: val.count,
+          percentage: total > 0 ? Math.round((val.count / total) * 100) : 0,
+        }
+      })
+      .sort((a, b) => b.count - a.count || a.nama.localeCompare(b.nama))
+      .slice(0, 5)
+
+    return sorted
+  }, [filteredData, pegawaiList])
 
   // Top 5 recent activities
   const recentActivities = useMemo(() => {
@@ -477,8 +562,89 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* 4. Analytics Grid (Donut & Ranked Bar Chart) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* 3.1 Status Tindak Lanjut & Evaluasi Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Card: Untuk Diketahui */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center text-primary">
+                <FileText size={16} />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Untuk Diketahui
+                </span>
+                <span className="text-xl font-black text-slate-900 tabular-nums">
+                  {statusStats.untukDiketahui.toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 tabular-nums">
+              {statusStats.untukDiketahuiPct}%
+            </span>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+            <span>Sifat laporan</span>
+            <span className="text-slate-700 font-semibold">Informatif / Selesai</span>
+          </div>
+        </div>
+
+        {/* Card: Perlu Tindak Lanjut */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                <AlertCircle size={16} />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Perlu Tindak Lanjut
+                </span>
+                <span className="text-xl font-black text-slate-900 tabular-nums">
+                  {statusStats.perluTindakLanjut.toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 tabular-nums">
+              {statusStats.perluTindakLanjutPct}%
+            </span>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+            <span>Perhatian</span>
+            <span className="text-amber-700 font-semibold">Memerlukan Aksi</span>
+          </div>
+        </div>
+
+        {/* Card: Sudah Dievaluasi */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <CheckCircle2 size={16} />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Sudah Dievaluasi
+                </span>
+                <span className="text-xl font-black text-slate-900 tabular-nums">
+                  {statusStats.sudahDievaluasi.toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 tabular-nums">
+              {statusStats.sudahDievaluasiPct}%
+            </span>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+            <span>Disposisi</span>
+            <span className="text-emerald-700 font-semibold">Telah Ditinjau Pimpinan</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Analytics Grid (Donut, Ranked Bar Chart & Top 5 Pegawai) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Donut Chart: Distribusi per Bidang */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
@@ -494,14 +660,14 @@ export function DashboardClient({
           </div>
 
           {chartsData.bidang.length > 0 ? (
-            <div className="flex flex-col sm:flex-row items-center gap-5 py-2">
+            <div className="flex flex-col items-center gap-3 py-2">
               <DynamicBidangDonutChart
                 data={chartsData.bidang}
                 totalLaporan={stats.totalLaporan}
                 colors={BIDANG_COLORS}
               />
 
-              <div className="flex-1 w-full space-y-2">
+              <div className="w-full space-y-2">
                 {chartsData.bidang.map((item, idx) => {
                   const pct =
                     stats.totalLaporan > 0
@@ -594,6 +760,76 @@ export function DashboardClient({
           ) : (
             <div className="h-44 flex items-center justify-center text-slate-400 text-xs font-medium">
               Tidak ada data kategori kegiatan
+            </div>
+          )}
+        </div>
+
+        {/* Ranked Leaderboard: Top 5 Pegawai Bertugas */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+            <div className="flex items-center gap-2">
+              <Award size={16} className="text-secondary" />
+              <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
+                Top 5 Pegawai Bertugas
+              </h3>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md tabular-nums">
+              Tugas Luar
+            </span>
+          </div>
+
+          {topPegawaiList.length > 0 ? (
+            <div className="space-y-3 my-auto">
+              {topPegawaiList.map((item, idx) => {
+                const maxVal = topPegawaiList[0]?.count || 1
+                const relativePct = Math.round((item.count / maxVal) * 100)
+
+                // Distinct badge colors for top 3
+                const rankBadgeClass =
+                  idx === 0
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                    : idx === 1
+                    ? 'bg-slate-200 text-slate-800 border border-slate-300'
+                    : idx === 2
+                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                    : 'bg-slate-100 text-slate-600'
+
+                return (
+                  <div key={item.id || item.nama} className="space-y-1">
+                    <div className="flex justify-between items-center text-xs font-medium">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span
+                          className={`text-[10px] font-black w-4 h-4 rounded flex items-center justify-center shrink-0 tabular-nums ${rankBadgeClass}`}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-slate-900 font-semibold truncate leading-tight" title={item.nama}>
+                            {item.nama}
+                          </p>
+                          <p className="text-[10px] text-slate-500 truncate leading-tight">
+                            {item.bidang}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 tabular-nums">
+                        <span className="font-bold text-slate-900">{item.count}</span>
+                        <span className="text-[10px] font-medium text-slate-500">tugas</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-1.5 rounded-full bg-secondary transition-all duration-700"
+                        style={{ width: `${relativePct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="h-44 flex items-center justify-center text-slate-400 text-xs font-medium">
+              Tidak ada data penugasan pegawai
             </div>
           )}
         </div>
