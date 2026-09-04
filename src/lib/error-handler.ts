@@ -34,16 +34,7 @@ export function formatUserFriendlyError(
   fallbackMessage = 'Terjadi kendala teknis saat memproses permintaan Anda.'
 ): FriendlyErrorResult {
   const errorCode = generateErrorCode()
-  let rawMessage = ''
-
-  if (error instanceof Error) {
-    rawMessage = error.message || error.name || ''
-  } else if (typeof error === 'string') {
-    rawMessage = error
-  } else if (error && typeof error === 'object' && 'message' in error) {
-    rawMessage = String((error as any).message || '')
-  }
-
+  const rawMessage = String((error as any)?.message || (error as any)?.name || error || '')
   const lower = rawMessage.toLowerCase()
 
   // 1. Deteksi Gangguan Jaringan / Koneksi
@@ -136,7 +127,7 @@ export function formatUserFriendlyError(
     }
   }
 
-  // 4. Pesan Umum / Fallback
+  // 6. Pesan Umum / Fallback
   return {
     errorCode,
     isNetworkIssue: false,

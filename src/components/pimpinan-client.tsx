@@ -11,7 +11,7 @@ import { logoutPimpinan, updateEvaluasiPimpinan, refreshData } from '@/lib/actio
 import type { Laporan, Pegawai } from '@/lib/types'
 import { EmptyState } from '@/components/ui/empty-state'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
-import { formatUserFriendlyError, logSystemError } from '@/lib/error-handler'
+import { formatUserFriendlyError, logSystemError, generateErrorCode } from '@/lib/error-handler'
 
 interface PimpinanClientProps {
   initialLaporan: Laporan[]
@@ -201,11 +201,11 @@ export function PimpinanClient({ initialLaporan, pegawaiList, session }: Pimpina
       } else {
         // Rollback jika server action gagal
         setLaporanList(previousList)
-        const friendly = formatUserFriendlyError(res.message, 'Terjadi kesalahan saat menyimpan evaluasi.')
-        logSystemError(friendly.errorCode, res.message, 'pimpinan-client.saveEvaluasi')
+        const errorCode = (res as any).errorCode || generateErrorCode()
+        logSystemError(errorCode, res.message, 'pimpinan-client.saveEvaluasi')
         Swal.fire({
           title: 'Gagal Menyimpan',
-          html: `<p class="mb-2 text-slate-700">${friendly.userMessage}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${friendly.errorCode}</span></p>`,
+          html: `<p class="mb-2 text-slate-700">${res.message || 'Terjadi kesalahan saat menyimpan evaluasi.'}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${errorCode}</span></p>`,
           icon: 'error',
           confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
         })

@@ -24,7 +24,7 @@ import {
   EvaluasiPimpinanSchema,
   LoginPimpinanSchema,
 } from './validations'
-import { formatUserFriendlyError, logSystemError } from './error-handler'
+import { formatUserFriendlyError, logSystemError, generateErrorCode } from './error-handler'
 
 // ============================================================
 // DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET WITH NEXT.JS CACHE)
@@ -135,6 +135,7 @@ export async function submitLaporan(
       return {
         status: 'error',
         message: validation.error.issues[0]?.message || 'Data formulir tidak valid.',
+        errorCode: generateErrorCode(),
       }
     }
 
@@ -165,6 +166,7 @@ export async function submitLaporan(
         status: 'error',
         message:
           'Total ukuran berkas lampiran melebihi batas aman transmisi server (4.5 MB). Silakan kompres foto atau berkas materi terlebih dahulu.',
+        errorCode: generateErrorCode(),
       }
     }
 
@@ -248,6 +250,7 @@ export async function updateEvaluasiPimpinan(
       return {
         status: 'error',
         message: validation.error.issues[0]?.message || 'Input evaluasi tidak valid.',
+        errorCode: generateErrorCode(),
       }
     }
 
