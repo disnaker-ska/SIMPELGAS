@@ -53,6 +53,12 @@ interface DashboardClientProps {
 
 const BIDANG_COLORS = [...DESIGN_TOKENS.charts.bidang]
 
+const RANK_BADGE_CLASSES = [
+  'bg-amber-100 text-amber-900 border border-amber-300',
+  'bg-slate-200 text-slate-800 border border-slate-300',
+  'bg-amber-50 text-amber-800 border border-amber-200',
+]
+
 function cleanText(str: string): string {
   return str ? str.toString().toLowerCase().replace(/\s+/g, ' ').trim() : ''
 }
@@ -186,7 +192,6 @@ export function DashboardClient({
   const statusStats = useMemo(() => {
     let untukDiketahui = 0
     let perluTindakLanjut = 0
-    let sudahDievaluasi = 0
 
     filteredData.forEach((item) => {
       if (isPerluTindakLanjut(item.status_tindak_lanjut || '')) {
@@ -194,13 +199,10 @@ export function DashboardClient({
       } else {
         untukDiketahui++
       }
-
-      if (item.catatan_pimpinan && item.catatan_pimpinan.trim() !== '') {
-        sudahDievaluasi++
-      }
     })
 
     const total = filteredData.length
+    const sudahDievaluasi = stats.totalDievaluasi
     return {
       untukDiketahui,
       untukDiketahuiPct: total > 0 ? Math.round((untukDiketahui / total) * 100) : 0,
@@ -209,7 +211,7 @@ export function DashboardClient({
       sudahDievaluasi,
       sudahDievaluasiPct: total > 0 ? Math.round((sudahDievaluasi / total) * 100) : 0,
     }
-  }, [filteredData])
+  }, [filteredData, stats.totalDievaluasi])
 
   // Top 5 Pegawai yang sering bertugas tugas luar (toleran terhadap variasi gelar)
   const topPegawaiList = useMemo(() => {
@@ -243,7 +245,6 @@ export function DashboardClient({
       }
     })
 
-    const total = filteredData.length
     const sorted = Array.from(countMap.entries())
       .map(([norm, val]) => {
         const master = masterMap.get(norm)
@@ -256,7 +257,6 @@ export function DashboardClient({
           bidang,
           jabatan,
           count: val.count,
-          percentage: total > 0 ? Math.round((val.count / total) * 100) : 0,
         }
       })
       .sort((a, b) => b.count - a.count || a.nama.localeCompare(b.nama))
@@ -783,16 +783,7 @@ export function DashboardClient({
               {topPegawaiList.map((item, idx) => {
                 const maxVal = topPegawaiList[0]?.count || 1
                 const relativePct = Math.round((item.count / maxVal) * 100)
-
-                // Distinct badge colors for top 3
-                const rankBadgeClass =
-                  idx === 0
-                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                    : idx === 1
-                    ? 'bg-slate-200 text-slate-800 border border-slate-300'
-                    : idx === 2
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : 'bg-slate-100 text-slate-600'
+                const rankBadgeClass = RANK_BADGE_CLASSES[idx] ?? 'bg-slate-100 text-slate-600'
 
                 return (
                   <div key={item.id || item.nama} className="space-y-1">
