@@ -206,6 +206,36 @@ describe('Server Actions Zod Validation', () => {
     expect(res.success).toBe(false)
     expect(res.message).toContain('PIN')
   })
+
+  it('sanitizes unexpected internal errors in submitLaporan', async () => {
+    const { submitLaporan } = await import('@/lib/actions')
+    const originalFetch = global.fetch
+    // Mock fetch to reject with internal TypeError
+    global.fetch = async () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'status')")
+    }
+
+    const validForm = {
+      pegawai_id: 'Budi Santoso',
+      bidang: 'BIDANG PPTK',
+      jabatan: 'Staff',
+      jenis_penugasan: 'Dalam Daerah',
+      tanggal_kegiatan: '2026-08-26',
+      nama_kegiatan: 'Sosialisasi',
+      tempat_kegiatan: 'Solo',
+      penyelenggara: 'Disnaker',
+      tamu_undangan: 'DPRD',
+      catatan_hasil: 'Koordinasi pembahasan kegiatan.',
+    }
+
+    const res = await submitLaporan(validForm)
+    expect(res.status).toBe('error')
+    expect(res.message).not.toContain('TypeError')
+    expect(res.message).not.toContain('undefined')
+    expect((res as any).errorCode).toMatch(/^ERR-SPG-[A-HJ-NP-Z2-9]{4,5}$/)
+
+    global.fetch = originalFetch
+  })
 })
 
 describe('refreshData action', () => {

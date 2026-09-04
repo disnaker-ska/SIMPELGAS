@@ -24,6 +24,7 @@ import {
   EvaluasiPimpinanSchema,
   LoginPimpinanSchema,
 } from './validations'
+import { formatUserFriendlyError, logSystemError } from './error-handler'
 
 // ============================================================
 // DATA FETCHING (GOOGLE APPS SCRIPT / SPREADSHEET WITH NEXT.JS CACHE)
@@ -127,89 +128,107 @@ export async function submitLaporan(
   dokFiles: AppsScriptFilePayload[] | any[] = [],
   materiFiles: AppsScriptFilePayload[] | any[] = []
 ) {
-  // Validasi form data dengan Zod
-  const validation = LaporanFormDataSchema.safeParse(formData)
-  if (!validation.success) {
-    return {
-      status: 'error',
-      message: validation.error.issues[0]?.message || 'Data formulir tidak valid.',
-    }
-  }
-
-  // Pastikan payload file berformat AppsScriptFilePayload
-  const dokumentasi: AppsScriptFilePayload[] = dokFiles
-    .filter((f) => f && typeof f === 'object' && f.base64)
-    .map((f) => ({
-      base64: f.base64,
-      name: f.name || 'dokumentasi.jpg',
-      mime: f.mime || 'image/jpeg',
-    }))
-
-  const materi: AppsScriptFilePayload[] = materiFiles
-    .filter((f) => f && typeof f === 'object' && f.base64)
-    .map((f) => ({
-      base64: f.base64,
-      name: f.name || 'materi.pdf',
-      mime: f.mime || 'application/pdf',
-    }))
-
-  // Validasi batas transmisi payload Base64 (Vercel Serverless limit 4.5 MB)
-  const totalBase64Length =
-    dokumentasi.reduce((acc, f) => acc + (f.base64?.length || 0), 0) +
-    materi.reduce((acc, f) => acc + (f.base64?.length || 0), 0)
-
-  if (totalBase64Length > 4.2 * 1024 * 1024) {
-    return {
-      status: 'error',
-      message:
-        'Total ukuran berkas lampiran melebihi batas aman transmisi server (4.5 MB). Silakan kompres foto atau berkas materi terlebih dahulu.',
-    }
-  }
-
-  // Temukan nama pegawai dari id / nama
-  let namaPegawai = formData.pegawai_id
   try {
-    const pegawaiList = await getPegawai()
-    const matched = pegawaiList.find(
-      (p) =>
-        p.id === formData.pegawai_id ||
-        p.nip === formData.pegawai_id ||
-        p.nama.toLowerCase().trim() === formData.pegawai_id.toLowerCase().trim()
-    )
-    if (matched && matched.nama) {
-      namaPegawai = matched.nama
+    // Validasi form data dengan Zod
+    const validation = LaporanFormDataSchema.safeParse(formData)
+    if (!validation.success) {
+      return {
+        status: 'error',
+        message: validation.error.issues[0]?.message || 'Data formulir tidak valid.',
+      }
     }
-  } catch {
-    // fallback tetap menggunakan formData.pegawai_id
-  }
 
-  const res = await submitLaporanToAppsScript({
-    namaPegawai,
-    bidang: formData.bidang,
-    jabatan: formData.jabatan,
-    jenisPenugasan: formData.jenis_penugasan,
-    tanggalKegiatan: formData.tanggal_kegiatan,
-    namaKegiatan: formData.nama_kegiatan,
-    tempatKegiatan: formData.tempat_kegiatan,
-    penyelenggara: formData.penyelenggara,
-    tamuUndangan: formData.tamu_undangan,
-    catatanHasil: formData.catatan_hasil,
-    dokumentasi,
-    materi,
-  })
+    // Pastikan payload file berformat AppsScriptFilePayload
+    const dokumentasi: AppsScriptFilePayload[] = dokFiles
+      .filter((f) => f && typeof f === 'object' && f.base64)
+      .map((f) => ({
+        base64: f.base64,
+        name: f.name || 'dokumentasi.jpg',
+        mime: f.mime || 'image/jpeg',
+      }))
 
-  if (res?.status === 'success') {
+    const materi: AppsScriptFilePayload[] = materiFiles
+      .filter((f) => f && typeof f === 'object' && f.base64)
+      .map((f) => ({
+        base64: f.base64,
+        name: f.name || 'materi.pdf',
+        mime: f.mime || 'application/pdf',
+      }))
+
+    // Validasi batas transmisi payload Base64 (Vercel Serverless limit 4.5 MB)
+    const totalBase64Length =
+      dokumentasi.reduce((acc, f) => acc + (f.base64?.length || 0), 0) +
+      materi.reduce((acc, f) => acc + (f.base64?.length || 0), 0)
+
+    if (totalBase64Length > 4.2 * 1024 * 1024) {
+      return {
+        status: 'error',
+        message:
+          'Total ukuran berkas lampiran melebihi batas aman transmisi server (4.5 MB). Silakan kompres foto atau berkas materi terlebih dahulu.',
+      }
+    }
+
+    // Temukan nama pegawai dari id / nama
+    let namaPegawai = formData.pegawai_id
     try {
-      revalidateTag('laporan')
+      const pegawaiList = await getPegawai()
+      const matched = pegawaiList.find(
+        (p) =>
+          p.id === formData.pegawai_id ||
+          p.nip === formData.pegawai_id ||
+          p.nama.toLowerCase().trim() === formData.pegawai_id.toLowerCase().trim()
+      )
+      if (matched && matched.nama) {
+        namaPegawai = matched.nama
+      }
     } catch {
-      // safe fallback if called outside Next.js request lifecycle
+      // fallback tetap menggunakan formData.pegawai_id
     }
-    revalidatePath('/dashboard')
-    revalidatePath('/cetak')
-    revalidatePath('/pimpinan')
-  }
 
-  return res
+    const res = await submitLaporanToAppsScript({
+      namaPegawai,
+      bidang: formData.bidang,
+      jabatan: formData.jabatan,
+      jenisPenugasan: formData.jenis_penugasan,
+      tanggalKegiatan: formData.tanggal_kegiatan,
+      namaKegiatan: formData.nama_kegiatan,
+      tempatKegiatan: formData.tempat_kegiatan,
+      penyelenggara: formData.penyelenggara,
+      tamuUndangan: formData.tamu_undangan,
+      catatanHasil: formData.catatan_hasil,
+      dokumentasi,
+      materi,
+    })
+
+    if (res?.status === 'success') {
+      try {
+        revalidateTag('laporan')
+      } catch {
+        // safe fallback if called outside Next.js request lifecycle
+      }
+      revalidatePath('/dashboard')
+      revalidatePath('/cetak')
+      revalidatePath('/pimpinan')
+    } else if (res?.status === 'error') {
+      const friendly = formatUserFriendlyError(res.message, 'Gagal menyimpan data ke Spreadsheet.')
+      logSystemError(friendly.errorCode, res.message, 'actions.submitLaporan')
+      return {
+        status: 'error',
+        message: friendly.userMessage,
+        errorCode: friendly.errorCode,
+      }
+    }
+
+    return res
+  } catch (error: any) {
+    const friendly = formatUserFriendlyError(error, 'Gagal menyimpan data ke sistem.')
+    logSystemError(friendly.errorCode, error, 'actions.submitLaporan')
+    return {
+      status: 'error',
+      message: friendly.userMessage,
+      errorCode: friendly.errorCode,
+    }
+  }
 }
 
 export async function updateEvaluasiPimpinan(
@@ -218,41 +237,59 @@ export async function updateEvaluasiPimpinan(
   catatanBaru: string,
   roleName: string
 ) {
-  const row = parseInt(laporanId, 10)
-  const validation = EvaluasiPimpinanSchema.safeParse({
-    rowIndex: row,
-    status_tindak_lanjut: status,
-    catatan_pimpinan: catatanBaru,
-  })
-  if (!validation.success) {
+  try {
+    const row = parseInt(laporanId, 10)
+    const validation = EvaluasiPimpinanSchema.safeParse({
+      rowIndex: row,
+      status_tindak_lanjut: status,
+      catatan_pimpinan: catatanBaru,
+    })
+    if (!validation.success) {
+      return {
+        status: 'error',
+        message: validation.error.issues[0]?.message || 'Input evaluasi tidak valid.',
+      }
+    }
+
+    // Ambil laporan saat ini untuk menyambung catatan pimpinan yang sudah ada
+    const all = await fetchLaporanFromAppsScript()
+    const current = all.find((l) => l.id === laporanId)
+    const existingNotes = current?.catatan_pimpinan
+      ? current.catatan_pimpinan.trim() + '\n\n'
+      : ''
+    const appendedNote = existingNotes + `[${roleName}]: ${catatanBaru.trim()}`
+
+    const res = await updateEvaluasiInAppsScript(row, status, appendedNote)
+
+    if (res.status === 'success') {
+      try {
+        revalidateTag('laporan')
+      } catch {
+        // safe fallback if called outside Next.js request lifecycle
+      }
+      revalidatePath('/dashboard')
+      revalidatePath('/pimpinan')
+      revalidatePath('/cetak')
+    } else if (res.status === 'error') {
+      const friendly = formatUserFriendlyError(res.message, 'Gagal memperbarui evaluasi di Spreadsheet.')
+      logSystemError(friendly.errorCode, res.message, 'actions.updateEvaluasiPimpinan')
+      return {
+        status: 'error',
+        message: friendly.userMessage,
+        errorCode: friendly.errorCode,
+      }
+    }
+
+    return res
+  } catch (error: any) {
+    const friendly = formatUserFriendlyError(error, 'Gagal memperbarui evaluasi di sistem.')
+    logSystemError(friendly.errorCode, error, 'actions.updateEvaluasiPimpinan')
     return {
       status: 'error',
-      message: validation.error.issues[0]?.message || 'Input evaluasi tidak valid.',
+      message: friendly.userMessage,
+      errorCode: friendly.errorCode,
     }
   }
-
-  // Ambil laporan saat ini untuk menyambung catatan pimpinan yang sudah ada
-  const all = await fetchLaporanFromAppsScript()
-  const current = all.find((l) => l.id === laporanId)
-  const existingNotes = current?.catatan_pimpinan
-    ? current.catatan_pimpinan.trim() + '\n\n'
-    : ''
-  const appendedNote = existingNotes + `[${roleName}]: ${catatanBaru.trim()}`
-
-  const res = await updateEvaluasiInAppsScript(row, status, appendedNote)
-
-  if (res.status === 'success') {
-    try {
-      revalidateTag('laporan')
-    } catch {
-      // safe fallback if called outside Next.js request lifecycle
-    }
-    revalidatePath('/dashboard')
-    revalidatePath('/pimpinan')
-    revalidatePath('/cetak')
-  }
-
-  return res
 }
 
 /**

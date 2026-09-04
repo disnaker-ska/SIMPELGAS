@@ -37,6 +37,7 @@ import { useSpeechToText } from '@/lib/use-speech-to-text'
 import { formatSpeechText, mergeTranscript } from '@/lib/speech-formatter'
 import { AiCompareModal } from '@/components/ui/ai-compare-modal'
 import { FilePreviewModal } from '@/components/ui/file-preview-modal'
+import { formatUserFriendlyError, logSystemError } from '@/lib/error-handler'
 import type { Pegawai } from '@/lib/types'
 
 function PhotoThumbnail({
@@ -345,10 +346,12 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         provider: data.provider || 'gemini',
       })
     } catch (error: any) {
+      const friendly = formatUserFriendlyError(error, 'Terjadi kendala saat memproses polesan AI.')
+      logSystemError(friendly.errorCode, error, 'input-form.enhanceTextWithAI')
       Swal.fire({
         icon: 'error',
         title: 'AI Gagal Memproses',
-        text: error.message || 'Terjadi kesalahan saat menghubungi server AI.',
+        html: `<p class="mb-2 text-slate-700">${friendly.userMessage}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${friendly.errorCode}</span></p>`,
         confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
       })
     } finally {
@@ -438,9 +441,14 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         throw new Error(res.message || 'Gagal menyimpan data ke Spreadsheet.')
       }
     } catch (error: any) {
+      const friendly = formatUserFriendlyError(
+        error,
+        'Pastikan koneksi internet stabil atau kurangi ukuran file lampiran.'
+      )
+      logSystemError(friendly.errorCode, error, 'input-form.handleSubmit')
       Swal.fire({
         title: 'Gagal Menyimpan',
-        text: error?.message || 'Pastikan koneksi internet stabil atau kurangi ukuran file lampiran.',
+        html: `<p class="mb-2 text-slate-700">${friendly.userMessage}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${friendly.errorCode}</span></p>`,
         icon: 'error',
         confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
       })

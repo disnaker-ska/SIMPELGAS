@@ -11,6 +11,7 @@ import { logoutPimpinan, updateEvaluasiPimpinan, refreshData } from '@/lib/actio
 import type { Laporan, Pegawai } from '@/lib/types'
 import { EmptyState } from '@/components/ui/empty-state'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
+import { formatUserFriendlyError, logSystemError } from '@/lib/error-handler'
 
 interface PimpinanClientProps {
   initialLaporan: Laporan[]
@@ -200,12 +201,26 @@ export function PimpinanClient({ initialLaporan, pegawaiList, session }: Pimpina
       } else {
         // Rollback jika server action gagal
         setLaporanList(previousList)
-        Swal.fire('Gagal Menyimpan', res.message || 'Terjadi kesalahan saat menyimpan evaluasi.', 'error')
+        const friendly = formatUserFriendlyError(res.message, 'Terjadi kesalahan saat menyimpan evaluasi.')
+        logSystemError(friendly.errorCode, res.message, 'pimpinan-client.saveEvaluasi')
+        Swal.fire({
+          title: 'Gagal Menyimpan',
+          html: `<p class="mb-2 text-slate-700">${friendly.userMessage}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${friendly.errorCode}</span></p>`,
+          icon: 'error',
+          confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+        })
       }
-    } catch {
+    } catch (err: any) {
       // Rollback jika error jaringan
       setLaporanList(previousList)
-      Swal.fire('Gagal Menyimpan', 'Terjadi kesalahan koneksi ke server.', 'error')
+      const friendly = formatUserFriendlyError(err, 'Terjadi kesalahan koneksi ke server.')
+      logSystemError(friendly.errorCode, err, 'pimpinan-client.saveEvaluasi')
+      Swal.fire({
+        title: 'Gagal Menyimpan',
+        html: `<p class="mb-2 text-slate-700">${friendly.userMessage}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${friendly.errorCode}</span></p>`,
+        icon: 'error',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+      })
     }
   }
 
@@ -269,7 +284,14 @@ export function PimpinanClient({ initialLaporan, pegawaiList, session }: Pimpina
       Swal.close()
       Swal.fire({ icon: 'success', title: 'Berhasil!', text: `File ${format.toUpperCase()} telah diunduh.`, timer: 2000, showConfirmButton: false })
     } catch (error: any) {
-      Swal.fire('Error', 'Gagal memproses ekspor: ' + error.message, 'error')
+      const friendly = formatUserFriendlyError(error, 'Gagal memproses ekspor berkas rekap.')
+      logSystemError(friendly.errorCode, error, 'pimpinan-client.exportRecap')
+      Swal.fire({
+        title: 'Gagal Ekspor',
+        html: `<p class="mb-2 text-slate-700">${friendly.userMessage}</p><p class="text-xs text-slate-500 font-mono">Kode Referensi: <span class="font-bold text-slate-700">${friendly.errorCode}</span></p>`,
+        icon: 'error',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+      })
     } finally {
       setIsExporting(false)
     }
