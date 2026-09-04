@@ -219,7 +219,15 @@ export async function submitLaporanToAppsScript(
       redirect: 'follow',
     })
 
-    return res.json()
+    if (!res.ok) {
+      return {
+        status: 'error',
+        message: `Google Apps Script mengembalikan HTTP ${res.status}: ${res.statusText}`,
+      }
+    }
+
+    const data = await res.json()
+    return data
   } catch (error: any) {
     console.error('[APPSCRIPT] Error submitting laporan to Apps Script:', error)
     return {

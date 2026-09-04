@@ -153,6 +153,19 @@ export async function submitLaporan(
       mime: f.mime || 'application/pdf',
     }))
 
+  // Validasi batas transmisi payload Base64 (Vercel Serverless limit 4.5 MB)
+  const totalBase64Length =
+    dokumentasi.reduce((acc, f) => acc + (f.base64?.length || 0), 0) +
+    materi.reduce((acc, f) => acc + (f.base64?.length || 0), 0)
+
+  if (totalBase64Length > 4.2 * 1024 * 1024) {
+    return {
+      status: 'error',
+      message:
+        'Total ukuran berkas lampiran melebihi batas aman transmisi server (4.5 MB). Silakan kompres foto atau berkas materi terlebih dahulu.',
+    }
+  }
+
   // Temukan nama pegawai dari id / nama
   let namaPegawai = formData.pegawai_id
   try {
@@ -185,7 +198,7 @@ export async function submitLaporan(
     materi,
   })
 
-  if (res.status === 'success') {
+  if (res?.status === 'success') {
     try {
       revalidateTag('laporan')
     } catch {

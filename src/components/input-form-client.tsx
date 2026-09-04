@@ -23,6 +23,16 @@ import {
 import Swal from 'sweetalert2'
 import { submitLaporan } from '@/lib/actions'
 import { DESIGN_TOKENS } from '@/lib/design-tokens'
+import {
+  formatFileSize,
+  validateMateriFileSize,
+  validateTotalPayloadSize,
+  compressImageFile,
+  compressPdfFile,
+  isPdfFile,
+  PDF_COMPRESS_THRESHOLD_BYTES,
+  MAX_MATERI_FILE_SIZE_BYTES,
+} from '@/lib/file-guard'
 import { useSpeechToText } from '@/lib/use-speech-to-text'
 import { formatSpeechText, mergeTranscript } from '@/lib/speech-formatter'
 import { AiCompareModal } from '@/components/ui/ai-compare-modal'
@@ -185,12 +195,64 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
   const fileDokInputRef = useRef<HTMLInputElement>(null)
   const fileMatInputRef = useRef<HTMLInputElement>(null)
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+  const [isOptimizingFile, setIsOptimizingFile] = useState(false)
+
+  const handleAddDocFiles = async (files: File[]) => {
+    const images = files.filter((f) => f && f.type.startsWith('image/'))
+    if (images.length === 0) return
+    setIsOptimizingFile(true)
+    try {
+      const compressed = await Promise.all(
+        images.map((file) => compressImageFile(file))
+      )
+      setDocFiles((prev) => [...prev, ...compressed])
+    } finally {
+      setIsOptimizingFile(false)
+    }
+  }
+
+  const handleAddMateriFiles = async (files: File[]) => {
+    if (!files || files.length === 0) return
+    setIsOptimizingFile(true)
+    try {
+      const validFiles: File[] = []
+      for (const file of files) {
+        if (isPdfFile(file.name, file.type)) {
+          if (file.size > PDF_COMPRESS_THRESHOLD_BYTES) {
+            const compressRes = await compressPdfFile(file)
+            if (compressRes.file.size > MAX_MATERI_FILE_SIZE_BYTES) {
+              Swal.fire({
+                icon: 'warning',
+                title: 'Ukuran PDF Terlalu Besar',
+                text: `Berkas "${file.name}" berukuran ${formatFileSize(file.size)}. Batas maksimal adalah ${formatFileSize(MAX_MATERI_FILE_SIZE_BYTES)} per dokumen agar tidak melampaui batas serverless Vercel (4.5 MB). Silakan kompres berkas PDF terlebih dahulu.`,
+                confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+              })
+              continue
+            }
+            validFiles.push(compressRes.file)
+          } else {
+            validFiles.push(file)
+          }
+        } else {
+          const check = validateMateriFileSize(file)
+          if (!check.valid) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Ukuran Berkas Terlalu Besar',
+              text: check.message,
+              confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+            })
+            continue
+          }
+          validFiles.push(file)
+        }
+      }
+      if (validFiles.length > 0) {
+        setMatFiles((prev) => [...prev, ...validFiles])
+      }
+    } finally {
+      setIsOptimizingFile(false)
+    }
   }
 
   const removeDocFile = (index: number) => {
@@ -230,65 +292,6 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
           encoded += '='.repeat(4 - (encoded.length % 4))
         }
         resolve(encoded)
-      }
-      reader.onerror = (error) => reject(error)
-    })
-  }
-
-  // Helper: Compress image
-  const compressImage = (file: File, maxSizeMB = 1): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      if (!file || !file.type.startsWith('image/')) {
-        resolve(file)
-        return
-      }
-      if (file.size / 1024 / 1024 < maxSizeMB) {
-        resolve(file)
-        return
-      }
-
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = (event) => {
-        const img = new Image()
-        img.src = event.target?.result as string
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          const MAX_WIDTH = 1200
-          const MAX_HEIGHT = 1200
-          let width = img.width
-          let height = img.height
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width
-              width = MAX_WIDTH
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height
-              height = MAX_HEIGHT
-            }
-          }
-
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')!
-          ctx.drawImage(img, 0, 0, width, height)
-
-          canvas.toBlob(
-            (blob) => {
-              const newFile = new File([blob!], file.name, {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              })
-              resolve(newFile)
-            },
-            'image/jpeg',
-            0.7
-          )
-        }
-        img.onerror = (error) => reject(error)
       }
       reader.onerror = (error) => reject(error)
     })
@@ -368,14 +371,21 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
         ? matFiles
         : (formData.getAll('file_materi') as File[]).filter((f) => f && f.size > 0)
 
-    try {
-      // Compress image files
-      const compressedDocFiles = await Promise.all(
-        docFilesToSubmit.map((file) => compressImage(file))
-      )
+    const payloadValidation = validateTotalPayloadSize(docFilesToSubmit, matFilesToSubmit)
+    if (!payloadValidation.valid) {
+      Swal.fire({
+        title: 'Total Lampiran Terlalu Besar',
+        text: payloadValidation.message,
+        icon: 'warning',
+        confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
+      })
+      setIsSubmitting(false)
+      return
+    }
 
+    try {
       const base64Docs = await Promise.all(
-        compressedDocFiles.map(async (file) => ({
+        docFilesToSubmit.map(async (file) => ({
           base64: (await getBase64(file)) || '',
           name: file.name,
           mime: file.type || 'image/jpeg',
@@ -406,6 +416,12 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
       }
 
       const res = await submitLaporan(formPayload, base64Docs, base64Mats)
+      if (!res) {
+        throw new Error(
+          'Server tidak memberikan respons. Kemungkinan koneksi terputus atau ukuran berkas lampiran melebihi kapasitas pengiriman serverless Vercel (4.5 MB).'
+        )
+      }
+
       if (res.status === 'success') {
         Swal.fire({
           title: 'Berhasil!',
@@ -424,7 +440,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
     } catch (error: any) {
       Swal.fire({
         title: 'Gagal Menyimpan',
-        text: error.message || 'Pastikan koneksi internet stabil atau kurangi ukuran file lampiran.',
+        text: error?.message || 'Pastikan koneksi internet stabil atau kurangi ukuran file lampiran.',
         icon: 'error',
         confirmButtonColor: DESIGN_TOKENS.sweetAlert.confirmButtonColor,
       })
@@ -442,6 +458,17 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
             <Loader2 className="animate-spin text-primary mb-2.5" size={36} />
             <h3 className="text-base font-bold text-slate-900 mb-1">Menyimpan Laporan</h3>
             <p className="text-slate-500 text-xs">Mohon tunggu, berkas dan data sedang diunggah...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Optimizing File Overlay */}
+      {isOptimizingFile && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm rounded-2xl">
+          <div className="bg-white p-5 rounded-2xl shadow-xl flex flex-col items-center text-center max-w-sm w-11/12 border border-slate-200">
+            <Loader2 className="animate-spin text-primary mb-2.5" size={36} />
+            <h3 className="text-base font-bold text-slate-900 mb-1">Mengoptimalkan Berkas</h3>
+            <p className="text-slate-500 text-xs">Sedang memproses dan mengompresi lampiran untuk pengiriman aman...</p>
           </div>
         </div>
       )}
@@ -725,12 +752,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                   e.preventDefault()
                   e.stopPropagation()
                   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
-                      f.type.startsWith('image/')
-                    )
-                    if (dropped.length > 0) {
-                      setDocFiles((prev) => [...prev, ...dropped])
-                    }
+                    handleAddDocFiles(Array.from(e.dataTransfer.files))
                   }
                 }}
                 className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100 flex flex-col justify-between"
@@ -773,8 +795,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     accept="image/*"
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
-                        const files = Array.from(e.target.files)
-                        setDocFiles((prev) => [...prev, ...files])
+                        handleAddDocFiles(Array.from(e.target.files))
                         e.target.value = ''
                       }
                     }}
@@ -843,10 +864,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                   e.preventDefault()
                   e.stopPropagation()
                   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    const dropped = Array.from(e.dataTransfer.files)
-                    if (dropped.length > 0) {
-                      setMatFiles((prev) => [...prev, ...dropped])
-                    }
+                    handleAddMateriFiles(Array.from(e.dataTransfer.files))
                   }
                 }}
                 className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between"
@@ -889,8 +907,7 @@ export function InputFormClient({ pegawaiList }: InputFormClientProps) {
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
-                        const files = Array.from(e.target.files)
-                        setMatFiles((prev) => [...prev, ...files])
+                        handleAddMateriFiles(Array.from(e.target.files))
                         e.target.value = ''
                       }
                     }}

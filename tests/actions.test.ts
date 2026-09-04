@@ -170,6 +170,27 @@ describe('Server Actions Zod Validation', () => {
     expect(res.message).toBeDefined()
   })
 
+  it('rejects submitLaporan when attachment base64 payload exceeds 4.2 MB', async () => {
+    const { submitLaporan } = await import('@/lib/actions')
+    const validForm = {
+      pegawai_id: 'Budi Santoso',
+      bidang: 'BIDANG PPTK',
+      jabatan: 'Staff',
+      jenis_penugasan: 'Dalam Daerah',
+      tanggal_kegiatan: '2026-08-26',
+      nama_kegiatan: 'Sosialisasi',
+      tempat_kegiatan: 'Solo',
+      penyelenggara: 'Disnaker',
+      tamu_undangan: 'DPRD',
+      catatan_hasil: 'Koordinasi pembahasan kegiatan.',
+    }
+    // 4.5 MB Base64 string
+    const oversizedBase64 = 'A'.repeat(4.5 * 1024 * 1024)
+    const res = await submitLaporan(validForm, [], [{ base64: oversizedBase64, name: 'big.pdf', mime: 'application/pdf' }])
+    expect(res.status).toBe('error')
+    expect(res.message).toContain('Total ukuran')
+  })
+
   it('rejects updateEvaluasiPimpinan with invalid status or invalid row', async () => {
     const { updateEvaluasiPimpinan } = await import('@/lib/actions')
     const resInvalidRow = await updateEvaluasiPimpinan('-5', 'Selesai (Untuk Diketahui)', 'Catatan', 'Kadis')

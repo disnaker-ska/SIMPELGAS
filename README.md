@@ -4,7 +4,7 @@
 
 ---
 
-## 📌 Tentang Proyek
+## Tentang Proyek
 
 **SIMPELGAS** (v2.0.0) adalah aplikasi web monolitik modern yang dirancang untuk memfasilitasi pelaporan kegiatan penugasan, monitoring real-time, evaluasi bertingkat oleh pejabat struktural, serta pencetakan lembar dinas formal bagi Aparatur Sipil Negara (ASN) di lingkungan Dinas Tenaga Kerja Kota Surakarta.
 
@@ -12,7 +12,7 @@ Sistem dibangun menggunakan pendekatan **Hybrid Serverless BFF (Backend-for-Fron
 
 ---
 
-## 🏗️ Struktur Proyek Monolith
+## Struktur Proyek Monolith
 
 Aplikasi menggunakan struktur direktori berbasis `src/` dengan pembagian modul yang bersih (*separation of concerns*):
 
@@ -57,20 +57,20 @@ SIMPELGAS/
 
 ---
 
-## 📚 Dokumen Referensi Teknis
+## Dokumen Referensi Teknis
 
 Seluruh dokumentasi teknis mendalam disimpan di folder [`docs/DOKUMEN_REFERENSI_TEKNIS/`](docs/DOKUMEN_REFERENSI_TEKNIS/):
 
-1. 📘 [PRD-SIMPELGAS.md](docs/DOKUMEN_REFERENSI_TEKNIS/PRD-SIMPELGAS.md) — *Product Requirements Document, fitur inti, dan alur bisnis.*
-2. 🏛️ [ARCHITECTURE.md](docs/DOKUMEN_REFERENSI_TEKNIS/ARCHITECTURE.md) — *Arsitektur sistem, topologi, security model, dan diagram aliran data.*
-3. ⚙️ [TECH_STACK.md](docs/DOKUMEN_REFERENSI_TEKNIS/TECH_STACK.md) — *Inventaris dependensi, ADR (Architectural Decision Records), dan panduan environment.*
-4. 🎨 [UIUX_DESIGN.md](docs/DOKUMEN_REFERENSI_TEKNIS/UIUX_DESIGN.md) — *Desain visual, palet warna resmi Pemkot Surakarta, tipografi, dan print layout.*
-5. 📐 [CODING_STANDARD.md](docs/DOKUMEN_REFERENSI_TEKNIS/CODING_STANDARD.md) — *Konvensi kode TypeScript, panduan Server Actions, dan aturan testing.*
-6. 🎯 [DEFINITION_OF_DONE.md](docs/DOKUMEN_REFERENSI_TEKNIS/DEFINITION_OF_DONE.md) — *Standar Definition of Done berbasis 5 Gerbang Bukti (Evidence Gates).*
+1. [PRD-SIMPELGAS.md](docs/DOKUMEN_REFERENSI_TEKNIS/PRD-SIMPELGAS.md) — *Product Requirements Document, fitur inti, dan alur bisnis.*
+2. [ARCHITECTURE.md](docs/DOKUMEN_REFERENSI_TEKNIS/ARCHITECTURE.md) — *Arsitektur sistem, topologi, security model, dan diagram aliran data.*
+3. [TECH_STACK.md](docs/DOKUMEN_REFERENSI_TEKNIS/TECH_STACK.md) — *Inventaris dependensi, ADR (Architectural Decision Records), dan panduan environment.*
+4. [UIUX_DESIGN.md](docs/DOKUMEN_REFERENSI_TEKNIS/UIUX_DESIGN.md) — *Desain visual, palet warna resmi Pemkot Surakarta, tipografi, dan print layout.*
+5. [CODING_STANDARD.md](docs/DOKUMEN_REFERENSI_TEKNIS/CODING_STANDARD.md) — *Konvensi kode TypeScript, panduan Server Actions, dan aturan testing.*
+6. [DEFINITION_OF_DONE.md](docs/DOKUMEN_REFERENSI_TEKNIS/DEFINITION_OF_DONE.md) — *Standar Definition of Done berbasis 5 Gerbang Bukti (Evidence Gates).*
 
 ---
 
-## 🚀 Panduan Memulai (Quick Start)
+## Panduan Memulai (Quick Start)
 
 ### 1. Prasyarat
 * Node.js versi 18.17 atau lebih baru
